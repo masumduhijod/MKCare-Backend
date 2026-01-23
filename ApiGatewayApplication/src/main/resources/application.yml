@@ -1,0 +1,528 @@
+#server:
+#  port: 8080
+#
+#spring:
+#  application:
+#    name: api-gateway
+#  cloud:
+#    gateway:
+#      discovery:
+#        locator:
+#          enabled: true
+#          lower-case-service-id: true
+#      routes:
+#        # User Service Routes
+#        - id: user-service
+#          uri: lb://USER-SERVICE
+#          predicates:
+#            - Path=/api/users/**, /api/auth/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # Patient Service Routes
+#        - id: patient-service
+#          uri: lb://PATIENT-SERVICE
+#          predicates:
+#            - Path=/api/patients/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # CVR Service Routes
+#        - id: cvr-service
+#          uri: lb://CVR-SERVICE
+#          predicates:
+#            - Path=/api/cvr/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # Appointment Service Routes
+#        - id: appointment-service
+#          uri: lb://APPOINTMENT-SERVICE
+#          predicates:
+#            - Path=/api/appointments/**, /api/slots/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # Doctor Service Routes
+#        - id: doctor-service
+#          uri: lb://DOCTOR-SERVICE
+#          predicates:
+#            - Path=/api/doctors/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # OPD Service Routes
+#        - id: opd-service
+#          uri: lb://OPD-SERVICE
+#          predicates:
+#            - Path=/api/opd/**, /api/consultations/**, /api/prescriptions/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # OPD Service Routes
+#        - id: opd-service
+#          uri: lb://OPD-SERVICE
+#          predicates:
+#            - Path=/api/opd/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # Billing Service Routes
+#        - id: billing-service
+#          uri: lb://BILLING-SERVICE
+#          predicates:
+#            - Path=/api/billing/**, /api/invoices/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#        # Doctor Service Routes
+#        - id: doctor-service
+#          uri: lb://DOCTOR-SERVICE
+#          predicates:
+#            - Path=/api/doctors/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+##        # Notification Service Routes
+##        - id: notification-service
+##          uri: lb://NOTIFICATION-SERVICE
+##          predicates:
+##            - Path=/api/notifications/**
+##          filters:
+##            - RewritePath=/api/(?<segment>.*), /$\{segment}
+#
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
+#    fetch-registry: true
+#    register-with-eureka: true
+#  instance:
+#    prefer-ip-address: true
+#    instance-id: ${spring.application.name}:${server.port}
+#
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: health,info,metrics,gateway
+#  endpoint:
+#    health:
+#      show-details: always
+#
+#logging:
+#  level:
+#    org.springframework.cloud.gateway: DEBUG
+#    org.springframework.web: DEBUG
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+#server:
+#  port: 8080
+#
+#spring:
+#  application:
+#    name: api-gateway
+#  cloud:
+#    gateway:
+#      discovery:
+#        locator:
+#          enabled: true
+#          lower-case-service-id: true
+#      routes:
+#          
+#          
+#          
+#          
+#        # ===================== USER SERVICE =====================
+#        - id: user-service
+#          uri: lb://USER-SERVICE
+#          predicates:
+#            - Path=/api/users/**, /api/auth/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== PATIENT SERVICE =====================
+#        - id: patient-service
+#          uri: lb://PATIENT-SERVICE
+#          predicates:
+#            - Path=/api/patients/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== CVR SERVICE =====================
+#        - id: cvr-service
+#          uri: lb://CVR-SERVICE
+#          predicates:
+#            - Path=/api/cvr/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== APPOINTMENT SERVICE =====================
+#        - id: appointment-service
+#          uri: lb://APPOINTMENT-SERVICE
+#          predicates:
+#            - Path=/api/appointments/**, /api/slots/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== DOCTOR SERVICE =====================
+#        - id: doctor-service
+#          uri: lb://DOCTOR-SERVICE
+#          predicates:
+#            - Path=/api/doctors/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== OPD SERVICE =====================
+#        - id: opd-service
+#          uri: lb://OPD-SERVICE
+#          predicates:
+#            - Path=/api/opd/**, /api/consultations/**, /api/prescriptions/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== BILLING SERVICE =====================
+#        - id: billing-service
+#          uri: lb://BILLING-SERVICE
+#          predicates:
+#            - Path=/api/billing/**, /api/invoices/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+## ==============================================================
+## Eureka Client Configuration
+## ==============================================================
+#
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
+#    fetch-registry: true
+#    register-with-eureka: true
+#  instance:
+#    prefer-ip-address: true
+#    instance-id: ${spring.application.name}:${server.port}
+#
+## ==============================================================
+## Management & Logging
+## ==============================================================
+#
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: health,info,metrics,gateway
+#  endpoint:
+#    health:
+#      show-details: always
+#
+#logging:
+#  level:
+#    org.springframework.cloud.gateway: DEBUG
+#    org.springframework.web: DEBUG
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+#
+## ==============================================================
+## Swagger (springdoc-openapi) Aggregation
+## ==============================================================
+#
+#springdoc:
+#  swagger-ui:
+#    urls:
+#      - name: USER-SERVICE
+#        url: /user-service/v3/api-docs
+#      - name: PATIENT-SERVICE
+#        url: /patient-service/v3/api-docs
+#      - name: CVR-SERVICE
+#        url: /cvr-service/v3/api-docs
+#      - name: APPOINTMENT-SERVICE
+#        url: /appointment-service/v3/api-docs
+#      - name: DOCTOR-SERVICE
+#        url: /doctor-service/v3/api-docs
+#      - name: OPD-SERVICE
+#        url: /opd-service/v3/api-docs
+#      - name: BILLING-SERVICE
+#        url: /billing-service/v3/api-docs
+#
+#
+#
+
+#server:
+#  port: 8080
+#
+#spring:
+#  application:
+#    name: api-gateway
+#  cloud:
+#    gateway:
+#
+#      ############### ⭐ GLOBAL CORS FIX ⭐ ###############
+#      globalcors:
+#        add-to-simple-url-handler-mapping: true
+#        corsConfigurations:
+#          '[/**]':
+#            allowedOrigins: "*"
+#            allowedMethods:
+#              - GET
+#              - POST
+#              - PUT
+#              - DELETE
+#              - OPTIONS
+#            allowedHeaders: "*"
+#            allowCredentials: false
+#      #####################################################
+#
+#      discovery:
+#        locator:
+#          enabled: true
+#          lower-case-service-id: true
+#
+#      routes:
+#        # ===================== USER SERVICE =====================
+#        - id: user-service
+#          uri: lb://USER-SERVICE
+#          predicates:
+#            - Path=/api/users/**, /api/auth/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== PATIENT SERVICE =====================
+#        - id: patient-service
+#          uri: lb://PATIENT-SERVICE
+#          predicates:
+#            - Path=/api/patients/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== CVR SERVICE =====================
+#        - id: cvr-service
+#          uri: lb://CVR-SERVICE
+#          predicates:
+#            - Path=/api/cvr/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== APPOINTMENT SERVICE =====================
+#        - id: appointment-service
+#          uri: lb://APPOINTMENT-SERVICE
+#          predicates:
+#            - Path=/api/appointments/**, /api/slots/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== DOCTOR SERVICE =====================
+#        - id: doctor-service
+#          uri: lb://DOCTOR-SERVICE
+#          predicates:
+#            - Path=/api/doctors/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== OPD SERVICE =====================
+#        - id: opd-service
+#          uri: lb://OPD-SERVICE
+#          predicates:
+#            - Path=/api/opd/**, /api/consultations/**, /api/prescriptions/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#        # ===================== BILLING SERVICE =====================
+#        - id: billing-service
+#          uri: lb://BILLING-SERVICE
+#          predicates:
+#            - Path=/api/billing/**, /api/invoices/**
+#          filters:
+#            - RewritePath=/api/(?<segment>.*), /${segment}
+#
+#
+## ==============================================================
+## Eureka Client Configuration
+## ==============================================================
+#
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
+#    fetch-registry: true
+#    register-with-eureka: true
+#  instance:
+#    prefer-ip-address: true
+#    instance-id: ${spring.application.name}:${server.port}
+#
+## ==============================================================
+## Management & Logging
+## ==============================================================
+#
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: health,info,metrics,gateway
+#  endpoint:
+#    health:
+#      show-details: always
+#
+#logging:
+#  level:
+#    org.springframework.cloud.gateway: DEBUG
+#    org.springframework.web: DEBUG
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+#
+## ==============================================================
+## Swagger (springdoc-openapi) Aggregation
+## ==============================================================
+#
+#springdoc:
+#  swagger-ui:
+#    urls:
+#      - name: USER-SERVICE
+#        url: /user-service/v3/api-docs
+#      - name: PATIENT-SERVICE
+#        url: /patient-service/v3/api-docs
+#      - name: CVR-SERVICE
+#        url: /cvr-service/v3/api-docs
+#      - name: APPOINTMENT-SERVICE
+#        url: /appointment-service/v3/api-docs
+#      - name: DOCTOR-SERVICE
+#        url: /doctor-service/v3/api-docs
+#      - name: OPD-SERVICE
+#        url: /opd-service/v3/api-docs
+#      - name: BILLING-SERVICE
+#        url: /billing-service/v3/api-docs
+
+
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:8383"   # Angular frontend
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+      routes:
+
+        # ===================== USER SERVICE =====================
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/users/**, /api/auth/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== PATIENT SERVICE =====================
+        - id: patient-service
+          uri: lb://PATIENT-SERVICE
+          predicates:
+            - Path=/api/patients/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== CVR SERVICE =====================
+        - id: cvr-service
+          uri: lb://CVR-SERVICE
+          predicates:
+            - Path=/api/cvr/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== APPOINTMENT SERVICE =====================
+        - id: appointment-service
+          uri: lb://APPOINTMENT-SERVICE
+          predicates:
+            - Path=/api/appointments/**, /api/slots/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== DOCTOR SERVICE =====================
+        - id: doctor-service
+          uri: lb://DOCTOR-SERVICE
+          predicates:
+            - Path=/api/doctors/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== OPD SERVICE =====================
+        - id: opd-service
+          uri: lb://OPD-SERVICE
+          predicates:
+            - Path=/api/opd/**, /api/consultations/**, /api/prescriptions/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # ===================== BILLING SERVICE =====================
+        - id: billing-service
+          uri: lb://BILLING-SERVICE
+          predicates:
+            - Path=/api/billing/**, /api/invoices/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: DEBUG
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: USER-SERVICE
+        url: /user-service/v3/api-docs
+      - name: PATIENT-SERVICE
+        url: /patient-service/v3/api-docs
+      - name: CVR-SERVICE
+        url: /cvr-service/v3/api-docs
+      - name: APPOINTMENT-SERVICE
+        url: /appointment-service/v3/api-docs
+      - name: DOCTOR-SERVICE
+        url: /doctor-service/v3/api-docs
+      - name: OPD-SERVICE
+        url: /opd-service/v3/api-docs
+      - name: BILLING-SERVICE
+        url: /billing-service/v3/api-docs
+
+
