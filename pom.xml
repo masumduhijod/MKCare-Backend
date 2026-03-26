@@ -16,6 +16,7 @@
         <module>DoctorServiceApplication</module>
         <module>OpdServiceApplication</module>
         <module>BillingService</module>
+        <module>Report-Service</module>
     </modules>
 
     <parent>

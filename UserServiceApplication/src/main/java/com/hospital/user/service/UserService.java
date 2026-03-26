@@ -11,6 +11,7 @@ package com.hospital.user.service;
  */
 // ========== UserService ==========
 
+import com.hospital.user.config.TenantContext;
 import com.hospital.user.dto.*;
 import com.hospital.user.entity.User;
 import com.hospital.user.repository.UserRepository;
@@ -18,11 +19,15 @@ import com.hospital.user.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,19 +41,44 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final ModelMapper modelMapper;
 
-    public LoginResponse login(LoginRequest request) {
-        log.info("Login attempt for user: {}", request.getUsername());
+    // ⭐ Master database JDBC template for tenant lookup
+    @Autowired
+    @Qualifier("masterJdbcTemplate")
+    private JdbcTemplate masterJdbcTemplate;
 
+    /**
+     * Login with multi-tenant support
+     */
+    public LoginResponse login(LoginRequest request) {
+        String currentTenant = TenantContext.getTenantId();
+        log.info("🔍 Login service called - Tenant from context: {}", currentTenant);
+        log.info("🔍 Login request - User: {}, Clinic: {}", request.getUsername(), request.getClinicId());
+
+        if (currentTenant == null || currentTenant.isEmpty()) {
+            log.error("❌ CRITICAL: Tenant context is NULL in service layer!");
+            throw new RuntimeException("Tenant context not set. Please try again.");
+        }
+
+        // Find user in tenant database
         User user = userRepository.findByUsername(request.getUsername())
-            .orElseThrow(() -> new RuntimeException("Invalid username or password"));
+                .orElseThrow(() -> {
+                    log.error("❌ User not found: {} in tenant: {}", request.getUsername(), currentTenant);
+                    return new RuntimeException("Invalid username or password");
+                });
+
+        log.info("✅ User found: {} (ID: {}) in database", user.getUsername(), user.getUserId());
 
         if (!user.isActive()) {
+            log.error("❌ User account is not active: {}", user.getUsername());
             throw new RuntimeException("User account is not active");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.error("❌ Password mismatch for user: {}", user.getUsername());
             throw new RuntimeException("Invalid username or password");
         }
+
+        log.info("✅ Password verified for user: {}", user.getUsername());
 
         // Update last login
         user.updateLastLogin();
@@ -56,7 +86,20 @@ public class UserService {
 
         // Generate JWT token
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());
-        
+
+        // Fetch tenant/clinic info from master database
+        log.info("🔍 Fetching clinic info from master DB for tenant: {}", request.getClinicId());
+        String sql = "SELECT tenant_id, clinic_code, clinic_name, logo_path, address, phone FROM tenants WHERE tenant_id = ?";
+
+        Map<String, Object> tenantInfo;
+        try {
+            tenantInfo = masterJdbcTemplate.queryForMap(sql, request.getClinicId());
+            log.info("✅ Clinic info fetched: {}", tenantInfo.get("clinic_name"));
+        } catch (Exception e) {
+            log.error("❌ Failed to fetch clinic info for tenant: {}", request.getClinicId(), e);
+            throw new RuntimeException("Failed to fetch clinic information");
+        }
+
         LoginResponse response = new LoginResponse();
         response.setToken(token);
         response.setUserId(user.getUserId());
@@ -66,95 +109,74 @@ public class UserService {
         response.setFullName(user.getFullName());
         response.setExpiresAt(LocalDateTime.now().plusHours(24));
 
-        log.info("User logged in successfully: {}", user.getUsername());
+        // Add tenant/clinic information
+        response.setTenantId((String) tenantInfo.get("tenant_id"));
+        response.setClinicName((String) tenantInfo.get("clinic_name"));
+        response.setClinicLogo((String) tenantInfo.get("logo_path"));
+        response.setClinicAddress((String) tenantInfo.get("address"));
+        response.setClinicPhone((String) tenantInfo.get("phone"));
+
+        log.info("✅ Login successful - User: {} at Clinic: {}", user.getUsername(), tenantInfo.get("clinic_name"));
         return response;
     }
 
-//    public UserDTO registerUser(UserRegistrationDTO dto) {
-//        log.info("Registering new user: {}", dto.getUsername());
-//
-//        if (userRepository.existsByUsername(dto.getUsername())) {
-//            throw new RuntimeException("Username already exists");
-//        }
-//
-//        if (userRepository.existsByEmail(dto.getEmail())) {
-//            throw new RuntimeException("Email already exists");
-//        }
-//
-//        User user = new User();
-//        user.setUsername(dto.getUsername());
-//        user.setPassword(passwordEncoder.encode(dto.getPassword()));
-//        user.setEmail(dto.getEmail());
-//        user.setRole(User.UserRole.valueOf(dto.getRole().toUpperCase()));
-//        user.setFirstName(dto.getFirstName());
-//        user.setLastName(dto.getLastName());
-//        user.setContactNumber(dto.getContactNumber());
-//        user.setCreatedBy(dto.getCreatedBy());
-//        user.setStatus(User.UserStatus.ACTIVE);
-//
-//        User saved = userRepository.save(user);
-//        log.info("User registered successfully: {}", saved.getUsername());
-//
-//        return modelMapper.map(saved, UserDTO.class);
-//    }
-    
     public UserDTO registerUser(UserRegistrationDTO dto) {
-    log.info("Registering new user: {}", dto.getUsername());
+        log.info("Registering new user: {}", dto.getUsername());
 
-    if (userRepository.existsByUsername(dto.getUsername())) {
-        throw new RuntimeException("Username already exists");
+        if (userRepository.existsByUsername(dto.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+
+        if (userRepository.existsByEmail(dto.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+
+        User user = new User();
+        user.setUsername(dto.getUsername());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setEmail(dto.getEmail());
+
+        // Parse Role (Case Insensitive)
+        User.UserRole role = parseUserRole(dto.getRole());
+        if (role == null) {
+            throw new RuntimeException("Invalid role: " + dto.getRole());
+        }
+        user.setRole(role);
+
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setContactNumber(dto.getContactNumber());
+        user.setCreatedBy(dto.getCreatedBy());
+        user.setStatus(User.UserStatus.ACTIVE);
+
+        User saved = userRepository.save(user);
+        log.info("User registered successfully: {}", saved.getUsername());
+
+        return modelMapper.map(saved, UserDTO.class);
     }
-
-    if (userRepository.existsByEmail(dto.getEmail())) {
-        throw new RuntimeException("Email already exists");
-    }
-
-    User user = new User();
-    user.setUsername(dto.getUsername());
-    user.setPassword(passwordEncoder.encode(dto.getPassword()));
-    user.setEmail(dto.getEmail());
-    
-    // ========== Parse Role (Case Insensitive) ==========
-    User.UserRole role = parseUserRole(dto.getRole());
-    if (role == null) {
-        throw new RuntimeException("Invalid role: " + dto.getRole());
-    }
-    user.setRole(role);
-    
-    user.setFirstName(dto.getFirstName());
-    user.setLastName(dto.getLastName());
-    user.setContactNumber(dto.getContactNumber());
-    user.setCreatedBy(dto.getCreatedBy());
-    user.setStatus(User.UserStatus.ACTIVE);
-
-    User saved = userRepository.save(user);
-    log.info("User registered successfully: {}", saved.getUsername());
-
-    return modelMapper.map(saved, UserDTO.class);
-}
 
     public UserDTO getUserByUsername(String username) {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
         return modelMapper.map(user, UserDTO.class);
     }
 
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll().stream()
-            .map(u -> modelMapper.map(u, UserDTO.class))
-            .collect(Collectors.toList());
+                .map(u -> modelMapper.map(u, UserDTO.class))
+                .collect(Collectors.toList());
     }
 
     public List<UserDTO> getUsersByRole(String role) {
         User.UserRole userRole = User.UserRole.valueOf(role.toUpperCase());
         return userRepository.findByRole(userRole).stream()
-            .map(u -> modelMapper.map(u, UserDTO.class))
-            .collect(Collectors.toList());
+                .map(u -> modelMapper.map(u, UserDTO.class))
+                .collect(Collectors.toList());
     }
 
     public void changePassword(String username, ChangePasswordDTO dto) {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
             throw new RuntimeException("Current password is incorrect");
@@ -168,59 +190,17 @@ public class UserService {
     public boolean validateToken(String token) {
         return jwtUtil.validateToken(token);
     }
-    
-//    /**
-//     * Update User (Admin Only)
-//     */
-//    public UserDTO updateUser(String username, UserUpdateDTO updateDTO) {
-//        log.info("Updating user: {}", username);
-//        
-//        User user = userRepository.findByUsername(username)
-//                .orElseThrow(() -> new RuntimeException("User not found: " + username));
-//        
-//        // Update fields
-//        user.setFirstName(updateDTO.getFirstName());
-//        user.setLastName(updateDTO.getLastName());
-//        user.setEmail(updateDTO.getEmail());
-//        user.setContactNumber(updateDTO.getContactNumber());
-//        
-//        // Update role
-//        try {
-//            user.setRole(User.UserRole.valueOf(updateDTO.getRole().toUpperCase()));
-//        } catch (IllegalArgumentException e) {
-//            throw new RuntimeException("Invalid role: " + updateDTO.getRole());
-//        }
-//        
-//        // Update status if provided
-//        if (updateDTO.getStatus() != null && !updateDTO.getStatus().isEmpty()) {
-//            try {
-//                user.setStatus(User.UserStatus.valueOf(updateDTO.getStatus().toUpperCase()));
-//            } catch (IllegalArgumentException e) {
-//                throw new RuntimeException("Invalid status: " + updateDTO.getStatus());
-//            }
-//        }
-//        
-//        User savedUser = userRepository.save(user);
-//        log.info("User updated successfully: {}", username);
-//        
-//        return modelMapper.map(savedUser, UserDTO.class);
-//    }
-    
-    /**
-     * Update User (Admin Only)
-     */
+
     public UserDTO updateUser(String username, UserUpdateDTO updateDTO) {
         log.info("Updating user: {}", username);
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
-        // Update basic fields
         user.setFirstName(updateDTO.getFirstName());
         user.setLastName(updateDTO.getLastName());
         user.setContactNumber(updateDTO.getContactNumber());
 
-        // Check if email is being changed
         if (!user.getEmail().equals(updateDTO.getEmail())) {
             if (userRepository.existsByEmail(updateDTO.getEmail())) {
                 throw new RuntimeException("Email already exists: " + updateDTO.getEmail());
@@ -228,31 +208,25 @@ public class UserService {
             user.setEmail(updateDTO.getEmail());
         }
 
-        // ========== UPDATE ROLE (Case Insensitive) ==========
         if (updateDTO.getRole() != null && !updateDTO.getRole().isEmpty()) {
             User.UserRole newRole = parseUserRole(updateDTO.getRole());
             if (newRole == null) {
-                throw new RuntimeException("Invalid role: " + updateDTO.getRole()
-                        + ". Valid roles: ADMIN, DOCTOR, RECEPTIONIST, NURSE, PHARMACIST, LAB_TECH, BILLING, PATIENT");
+                throw new RuntimeException("Invalid role: " + updateDTO.getRole());
             }
             user.setRole(newRole);
         }
 
-        // ========== UPDATE STATUS (Case Insensitive) ==========
         if (updateDTO.getStatus() != null && !updateDTO.getStatus().isEmpty()) {
             User.UserStatus newStatus = parseUserStatus(updateDTO.getStatus());
             if (newStatus == null) {
-                throw new RuntimeException("Invalid status: " + updateDTO.getStatus()
-                        + ". Valid statuses: ACTIVE, INACTIVE, LOCKED");
+                throw new RuntimeException("Invalid status: " + updateDTO.getStatus());
             }
             user.setStatus(newStatus);
         }
 
-        // Save user
         User savedUser = userRepository.save(user);
         log.info("User updated successfully: {}", username);
 
-        // Manual mapping to avoid enum issues
         UserDTO dto = new UserDTO();
         dto.setUserId(savedUser.getUserId());
         dto.setUsername(savedUser.getUsername());
@@ -269,19 +243,13 @@ public class UserService {
         return dto;
     }
 
-    /**
-     * Parse UserRole from string (Case Insensitive) Accepts: "doctor",
-     * "Doctor", "DOCTOR", etc.
-     */
     private User.UserRole parseUserRole(String roleStr) {
         if (roleStr == null || roleStr.isEmpty()) {
             return null;
         }
 
-        // Convert to uppercase and handle special cases
         String normalized = roleStr.toUpperCase().trim();
 
-        // Handle "LAB_TECHNICIAN" variations
         if (normalized.equals("LAB_TECHNICIAN") || normalized.equals("LAB TECHNICIAN")) {
             normalized = "LAB_TECH";
         }
@@ -294,10 +262,6 @@ public class UserService {
         }
     }
 
-    /**
-     * Parse UserStatus from string (Case Insensitive) Accepts: "active",
-     * "Active", "ACTIVE", etc.
-     */
     private User.UserStatus parseUserStatus(String statusStr) {
         if (statusStr == null || statusStr.isEmpty()) {
             return null;
@@ -311,41 +275,33 @@ public class UserService {
         }
     }
 
-    /**
-     * Delete User (Admin Only)
-     */
     public void deleteUser(String username) {
         log.info("Deleting user: {}", username);
-        
-        // Prevent deleting admin user
+
         if ("admin".equalsIgnoreCase(username)) {
             throw new RuntimeException("Cannot delete admin user");
         }
-        
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
-        
+
         userRepository.delete(user);
         log.info("User deleted successfully: {}", username);
     }
 
-    /**
-     * Reset Password (Admin Only)
-     */
     public void resetPassword(String username, String newPassword) {
         log.info("Resetting password for user: {}", username);
-        
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
-        
+
         if (newPassword == null || newPassword.length() < 6) {
             throw new RuntimeException("Password must be at least 6 characters");
         }
-        
+
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        
+
         log.info("Password reset successfully for user: {}", username);
     }
 }
-

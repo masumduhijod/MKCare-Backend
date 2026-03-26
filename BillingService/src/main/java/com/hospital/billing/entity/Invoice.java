@@ -11,7 +11,7 @@ package com.hospital.billing.entity;
  */
 import lombok.*;
 import javax.persistence.*;
-import javax.validation.constraints.*;
+//import javax.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -137,24 +137,48 @@ public class Invoice {
         item.setInvoice(this);
     }
 
-    public void calculateTotals() {
-        subTotal = items.stream()
-            .map(InvoiceItem::getAmount)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+public void calculateTotals() {
 
-        if (discountPercentage.compareTo(BigDecimal.ZERO) > 0) {
-            discountAmount = subTotal.multiply(discountPercentage).divide(new BigDecimal("100"));
-        }
+    subTotal = BigDecimal.ZERO;
 
-        BigDecimal afterDiscount = subTotal.subtract(discountAmount);
+    for (InvoiceItem item : items) {
 
-        if (taxPercentage.compareTo(BigDecimal.ZERO) > 0) {
-            taxAmount = afterDiscount.multiply(taxPercentage).divide(new BigDecimal("100"));
-        }
+        BigDecimal itemTotal =
+                item.getUnitPrice()
+                    .multiply(BigDecimal.valueOf(item.getQuantity()));
 
-        totalAmount = afterDiscount.add(taxAmount);
-        outstandingAmount = totalAmount.subtract(paidAmount);
+        item.setAmount(itemTotal);  // VERY IMPORTANT
+
+        subTotal = subTotal.add(itemTotal);
     }
+
+    // Discount
+    if (discountPercentage != null &&
+        discountPercentage.compareTo(BigDecimal.ZERO) > 0) {
+
+        discountAmount = subTotal
+                .multiply(discountPercentage)
+                .divide(new BigDecimal("100"));
+    } else {
+        discountAmount = BigDecimal.ZERO;
+    }
+
+    BigDecimal afterDiscount = subTotal.subtract(discountAmount);
+
+    // Tax
+    if (taxPercentage != null &&
+        taxPercentage.compareTo(BigDecimal.ZERO) > 0) {
+
+        taxAmount = afterDiscount
+                .multiply(taxPercentage)
+                .divide(new BigDecimal("100"));
+    } else {
+        taxAmount = BigDecimal.ZERO;
+    }
+
+    totalAmount = afterDiscount.add(taxAmount);
+    outstandingAmount = totalAmount.subtract(paidAmount);
+}
 
     public void addPayment(Payment payment) {
         payments.add(payment);

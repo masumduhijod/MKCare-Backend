@@ -6,8 +6,8 @@
 package com.hospital.billing.dto;
 
 import java.math.BigDecimal;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+//import javax.validation.constraints.NotBlank;
+//import javax.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,12 +20,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InvoiceItemDTO {
-    @NotBlank
+//    @NotBlank
     private String itemName;
     private String description;
-    @NotNull
+//    @NotNull
     private Integer quantity;
-    @NotNull
+//    @NotNull
     private BigDecimal unitPrice;
     private String itemType;
 }

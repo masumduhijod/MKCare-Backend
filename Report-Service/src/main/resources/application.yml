@@ -1,0 +1,54 @@
+## YAML Template.
+---
+server:
+  port: 8089
+
+spring:
+  application:
+    name: report-service
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 10000
+        readTimeout: 30000
+        loggerLevel: BASIC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.hospital.report: DEBUG
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ? Load Balancing (Ribbon via Eureka)
+ribbon:
+  eureka:
+    enabled: true
+  ConnectTimeout: 5000
+  ReadTimeout: 5000
+  MaxAutoRetries: 1
+  MaxAutoRetriesNextServer: 1

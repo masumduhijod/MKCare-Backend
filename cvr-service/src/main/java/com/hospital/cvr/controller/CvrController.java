@@ -384,4 +384,23 @@ public class CvrController {
 
         return ResponseEntity.ok(response);
     }
+    /**
+ * Delete vitals for CVR
+ * DELETE /cvr/{cvrNumber}/vitals
+ */
+@DeleteMapping("/{cvrNumber}/vitals")
+public ResponseEntity<ApiResponse<String>> deleteVitals(
+        @PathVariable String cvrNumber) {
+
+    log.info("API: Delete vitals for CVR: {}", cvrNumber);
+
+    String message = cvrService.deleteVitalsByCVR(cvrNumber);
+
+    ApiResponse<String> response = ApiResponse.success(
+            message,
+            null
+    );
+
+    return ResponseEntity.ok(response);
+}
 }

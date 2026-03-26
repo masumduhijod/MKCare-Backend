@@ -53,10 +53,10 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     boolean existsByAadharNumber(String aadharNumber);
 
     /**
-     * Get last generated PIN number
+     * Get last generated PIN number (only top 1 result)
      */
-    @Query("SELECT p.pinNumber FROM Patient p ORDER BY p.patientId DESC")
-    List<String> findTopByOrderByPatientIdDesc();
+    @Query(value = "SELECT pin_number FROM patients ORDER BY patient_id DESC LIMIT 1", nativeQuery = true)
+    Optional<String> findLastPinNumber();
 
     /**
      * Search patients by name (first name or last name)

@@ -158,4 +158,8 @@ public interface CvrService {
  */
 CvrDTO getCVRByAppointmentId(String appointmentId);
 
+//vitals delete by cvr no 
+
+String deleteVitalsByCVR(String cvrNumber);
+
 }

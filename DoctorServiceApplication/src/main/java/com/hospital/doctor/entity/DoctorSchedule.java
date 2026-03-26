@@ -139,8 +139,7 @@ import java.time.LocalTime;
 //}   
 
 @Entity
-@Table(name = "doctor_schedules", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"doctor_id", "schedule_date"})) // CHANGED
+@Table(name = "doctor_schedules") // CHANGED: Removed uniqueConstraints
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

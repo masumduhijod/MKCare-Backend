@@ -1,4 +1,4 @@
-
+package com.hospital.getway.filter;
 import javax.ws.rs.core.HttpHeaders;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.context.annotation.Bean;

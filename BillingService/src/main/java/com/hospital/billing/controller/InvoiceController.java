@@ -12,6 +12,7 @@ package com.hospital.billing.controller;
 // ========== Controllers ==========
 
 import com.hospital.billing.dto.*;
+import com.hospital.billing.entity.Invoice;
 import com.hospital.billing.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,7 @@ import java.util.List;
 @RequestMapping("/billing/invoices")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 class InvoiceController {
     
     private final InvoiceService invoiceService;
@@ -56,5 +57,26 @@ class InvoiceController {
         List<InvoiceDTO> invoices = invoiceService.getPendingInvoices();
         return ResponseEntity.ok(ApiResponse.success(invoices.size() + " pending invoice(s)", invoices));
     }
+    
+@GetMapping("/doctor/{doctorId}/date/{date}")
+public ResponseEntity<ApiResponse<List<InvoiceDTO>>> 
+getInvoicesByDoctorAndDate(
+        @PathVariable String doctorId,
+        @PathVariable String date) {
+
+    List<InvoiceDTO> invoices =
+            invoiceService.getInvoicesByDoctorAndDate(doctorId, date);
+
+    return ResponseEntity.ok(
+            ApiResponse.success("Invoices loaded", invoices)
+    );
+}
+
+
+@GetMapping("/by-pin/{pin}")
+public List<InvoiceDTO> getByPin(@PathVariable String pin) {
+    return invoiceService.getPatientInvoices(pin);
+}
+
 }
 

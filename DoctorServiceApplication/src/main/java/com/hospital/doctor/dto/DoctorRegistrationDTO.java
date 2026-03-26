@@ -27,33 +27,33 @@ import java.util.List;
 @AllArgsConstructor
 public class DoctorRegistrationDTO {
     
-    @NotBlank(message = "First name is required")
+//    @NotBlank(message = "First name is required")
     private String firstName;
     
     private String lastName;
     
-    @NotBlank(message = "Specialization is required")
+//    @NotBlank(message = "Specialization is required")
     private String specialization;
     
     private String qualification;
     
-    @Min(value = 0, message = "Experience must be non-negative")
+//    @Min(value = 0, message = "Experience must be non-negative")
     private Integer experienceYears;
     
     private String department;
     
-    @NotBlank(message = "Contact number is required")
-    @Pattern(regexp = "^[0-9]{10}$", message = "Contact number must be 10 digits")
+//    @NotBlank(message = "Contact number is required")
+//    @Pattern(regexp = "^[0-9]{10}$", message = "Contact number must be 10 digits")
     private String contactNumber;
     
-    @Email(message = "Invalid email format")
+//    @Email(message = "Invalid email format")
     private String email;
     
     private String licenseNumber;
     private String registrationNumber;
     
-    @NotNull(message = "Consultation fee is required")
-    @DecimalMin(value = "0.0", message = "Fee must be positive")
+//    @NotNull(message = "Consultation fee is required")
+//    @DecimalMin(value = "0.0", message = "Fee must be positive")
     private BigDecimal consultationFee;
     
     private BigDecimal followUpFee;
@@ -66,6 +66,6 @@ public class DoctorRegistrationDTO {
     private String languagesSpoken;
     private String roomNumber;
     
-    @NotBlank(message = "Created by is required")
+//    @NotBlank(message = "Created by is required")
     private String createdBy;
 }

@@ -59,8 +59,7 @@ public class PatientServiceImpl implements PatientService {
         }
 
         // Generate unique PIN
-        String lastPIN = getLastPINFromDB();
-        String newPIN = pinGenerator.generatePIN(lastPIN);
+        String newPIN = generateUniquePIN();
         log.info("Generated PIN: {}", newPIN);
 
         // Map DTO to Entity
@@ -202,8 +201,23 @@ public class PatientServiceImpl implements PatientService {
 
     // Helper methods
     private String getLastPINFromDB() {
-        List<String> pins = patientRepository.findTopByOrderByPatientIdDesc();
-        return pins.isEmpty() ? null : pins.get(0);
+        return patientRepository.findLastPinNumber().orElse(null);
+    }
+
+    private String generateUniquePIN() {
+        String lastPIN = getLastPINFromDB();
+        String newPIN = pinGenerator.generatePIN(lastPIN);
+
+        // Safety check: if generated PIN already exists, keep incrementing
+        int attempts = 0;
+        while (patientRepository.existsByPinNumber(newPIN)) {
+            log.warn("PIN collision detected: {}. Regenerating...", newPIN);
+            newPIN = pinGenerator.generatePIN(newPIN);
+            if (++attempts > 10) {
+                throw new RuntimeException("Unable to generate unique PIN after 10 attempts");
+            }
+        }
+        return newPIN;
     }
 
     private PatientDTO mapToDTO(Patient patient) {

@@ -7,8 +7,8 @@ package com.hospital.billing.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotEmpty;
+//import javax.validation.constraints.NotBlank;
+//import javax.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,18 +21,18 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateInvoiceDTO {
-    @NotBlank
+//    @NotBlank
     private String pinNumber;
     private String appointmentId;
     private String cvrNumber;
     private String doctorId;
-    @NotBlank
+//    @NotBlank
     private String invoiceType;
     private BigDecimal discountPercentage;
     private BigDecimal taxPercentage;
     private Boolean isInsuranceClaim;
     private String insuranceProvider;
-    @NotEmpty
+//    @NotEmpty
     private List<InvoiceItemDTO> items;
     private String createdBy;
 }

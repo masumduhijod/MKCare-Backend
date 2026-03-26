@@ -1,4 +1,4 @@
-## YAML Template.
+## YAML Template - Multi-Tenant Configuration for Patient Service
 ---
 server:
   port: 8084
@@ -7,12 +7,22 @@ spring:
   application:
     name: patient-service
   
+  # ⭐ Master Database (Tenant Lookup)
   datasource:
-    url: jdbc:mysql://localhost:3306/hms_patients_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: Pass@123
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  
+    master:
+      jdbc-url: jdbc:mysql://localhost:3306/hms_master?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      username: root
+      password: Pass@123
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        maximum-pool-size: 5
+    
+    # ⭐ Tenant Database (Dynamic - configured at runtime)
+    tenant:
+      username: root
+      password: Pass@123
+      driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -48,3 +58,11 @@ logging:
     org.hibernate.SQL: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+# ? Load Balancing (Ribbon via Eureka)
+ribbon:
+  eureka:
+    enabled: true
+  ConnectTimeout: 5000
+  ReadTimeout: 5000
+  MaxAutoRetries: 1
+  MaxAutoRetriesNextServer: 1

@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RecordVitalsDTO {
     
-    @NotBlank(message = "CVR number is required")
+//    @NotBlank(message = "CVR number is required")
     private String cvrNumber;
     
     private Double temperatureF;
@@ -31,7 +31,7 @@ public class RecordVitalsDTO {
     private Double weightKg;
     private Double heightCm;
     
-    @NotBlank(message = "Recorded by is required")
+//    @NotBlank(message = "Recorded by is required")
     private String recordedBy;
 }
 

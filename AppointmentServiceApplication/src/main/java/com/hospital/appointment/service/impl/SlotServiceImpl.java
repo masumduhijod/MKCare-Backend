@@ -39,55 +39,63 @@ public class SlotServiceImpl implements SlotService {
 
     @Override
     public List<SlotDTO> generateSlots(String doctorId, LocalDate date) {
-        log.info("Generating slots for doctor: {} on {}", doctorId, date);
+        log.info("Generating/syncing slots for doctor: {} on {}", doctorId, date);
 
         // Check if slots already exist
         List<AppointmentSlot> existingSlots = slotRepository
             .findByDoctorIdAndSlotDateOrderBySlotTimeAsc(doctorId, date);
         
-        if (!existingSlots.isEmpty()) {
-            log.info("Slots already exist for this date. Returning existing slots.");
-            return existingSlots.stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
-        }
+        java.util.Set<LocalTime> existingSlotTimes = existingSlots.stream()
+            .map(AppointmentSlot::getSlotTime)
+            .collect(Collectors.toSet());
 
-        // *** CHANGED: Get doctor schedule by DATE (not day of week) ***
-        DoctorScheduleDTO schedule;
+        // *** CHANGED: Get all doctor schedules for the date ***
+        List<DoctorScheduleDTO> schedules;
         try {
-            schedule = doctorServiceClient
-                .getScheduleByDate(doctorId, date)
+            schedules = doctorServiceClient
+                .getSchedulesByDateRange(doctorId, date, date)
                 .getData();
-        } catch (FeignException.NotFound e) {
-            log.warn("No schedule found for doctor {} on {}", doctorId, date);
-            throw new DoctorNotFoundException(
-                "Doctor has no schedule configured for " + date
-            );
         } catch (FeignException e) {
             log.error("Error fetching doctor schedule: {}", e.getMessage());
             throw new DoctorNotFoundException(
-                "Error retrieving doctor schedule: " + e.getMessage()
+                "Error retrieving doctor schedules: " + e.getMessage()
             );
         }
 
-        if (schedule == null || !schedule.getIsActive()) {
-            log.warn("Schedule not active for doctor {} on {}", doctorId, date);
-            return new ArrayList<>();
+        if (schedules == null || schedules.isEmpty()) {
+            log.warn("No schedule found for doctor {} on {}", doctorId, date);
+            return existingSlots.stream().map(this::mapToDTO).collect(Collectors.toList());
         }
 
-        // *** CHANGED: Generate slots based on actual schedule ***
-        List<AppointmentSlot> slots = generateSlotsFromSchedule(
-            doctorId, 
-            date, 
-            schedule
-        );
+        List<AppointmentSlot> slotsToSave = new ArrayList<>();
 
-        // Save slots
-        List<AppointmentSlot> savedSlots = slotRepository.saveAll(slots);
-        log.info("Generated {} slots for doctor {} on {}", 
+        for (DoctorScheduleDTO schedule : schedules) {
+            if (schedule == null || !schedule.getIsActive()) continue;
+
+            List<AppointmentSlot> potentialSlots = generateSlotsFromSchedule(doctorId, date, schedule);
+            for (AppointmentSlot slot : potentialSlots) {
+                if (!existingSlotTimes.contains(slot.getSlotTime())) {
+                    slotsToSave.add(slot);
+                    existingSlotTimes.add(slot.getSlotTime());
+                }
+            }
+        }
+
+        if (slotsToSave.isEmpty()) {
+            log.info("All slots already exist. Returning existing slots.");
+            return existingSlots.stream().map(this::mapToDTO).collect(Collectors.toList());
+        }
+
+        // Save new slots
+        List<AppointmentSlot> savedSlots = slotRepository.saveAll(slotsToSave);
+        log.info("Generated {} new slots for doctor {} on {}", 
             savedSlots.size(), doctorId, date);
+            
+        // Combine and return all slots ordered by time
+        existingSlots.addAll(savedSlots);
+        existingSlots.sort((s1, s2) -> s1.getSlotTime().compareTo(s2.getSlotTime()));
 
-        return savedSlots.stream()
+        return existingSlots.stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }

@@ -36,6 +36,13 @@ public interface DoctorServiceClient {
         @PathVariable("scheduleDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduleDate
     );
 
+    @GetMapping("/doctors/{doctorId}/schedules/range")
+    ApiResponse<java.util.List<DoctorScheduleDTO>> getSchedulesByDateRange(
+        @PathVariable("doctorId") String doctorId,
+        @org.springframework.web.bind.annotation.RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @org.springframework.web.bind.annotation.RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    );
+
     @GetMapping("/doctors/exists/{doctorId}")
     ApiResponse<Boolean> checkDoctorExists(@PathVariable("doctorId") String doctorId);
 }

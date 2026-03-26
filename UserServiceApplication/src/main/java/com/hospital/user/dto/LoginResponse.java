@@ -5,6 +5,7 @@
  */
 package com.hospital.user.dto;
 
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -12,10 +13,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- *
- * @author mduhijod
+ * Login Response DTO
+ * Now includes tenant/clinic information
  */
-// ========== Login Response ==========
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,6 +27,14 @@ public class LoginResponse {
     private String email;
     private String role;
     private String fullName;
+    
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime expiresAt;
+    
+    // ⭐ NEW FIELDS - Tenant/Clinic Information
+    private String tenantId;      // e.g., "HMS001"
+    private String clinicName;    // e.g., "HMS Default Clinic"
+    private String clinicLogo;    // e.g., "/logos/hms.png"
+    private String clinicAddress;
+    private String clinicPhone;
 }

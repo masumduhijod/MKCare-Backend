@@ -32,7 +32,8 @@ public class InvoiceService {
     
     public InvoiceDTO createInvoice(CreateInvoiceDTO dto) {
         log.info("Creating invoice for PIN: {}", dto.getPinNumber());
-        
+        System.out.println("Items size: " + dto.getItems().size());
+System.out.println("DTO Data: " + dto);
         String invoiceNumber = generateInvoiceNumber();
         
         Invoice invoice = new Invoice();
@@ -62,6 +63,10 @@ public class InvoiceService {
         }
         
         invoice.calculateTotals();
+        // ✅ IMPORTANT: initialize payment fields correctly
+invoice.setPaidAmount(BigDecimal.ZERO);
+invoice.setOutstandingAmount(invoice.getTotalAmount());
+invoice.setPaymentStatus(Invoice.PaymentStatus.PENDING);
         Invoice saved = invoiceRepository.save(invoice);
         
         log.info("Invoice created: {}", invoiceNumber);
@@ -97,5 +102,19 @@ public class InvoiceService {
             .collect(Collectors.toList()));
         return dto;
     }
+ public List<InvoiceDTO> getInvoicesByDoctorAndDate(String doctorId, String date) {
+
+    List<Invoice> invoices =
+            invoiceRepository.findByDoctorIdAndInvoiceDate(
+                    doctorId,
+                    java.time.LocalDate.parse(date)
+            );
+
+    return invoices.stream()
+            .map(this::mapToDTO)
+            .collect(Collectors.toList());
+}
+
+
 }
 

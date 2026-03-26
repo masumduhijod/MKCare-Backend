@@ -119,7 +119,6 @@ package com.hospital.user.config;
 //    }
 //} 
 
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -176,7 +175,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 ////    }
 //}
 
-
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
@@ -189,31 +187,30 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-            .csrf().disable()
-            .cors().disable()
-            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            .and()
-            .authorizeRequests()
-            
-            // Allow browser preflight requests
-            .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            
-            // Public endpoints - Swagger
-            .antMatchers(
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html",
-                "/swagger-resources/**",
-                "/webjars/**"
-            ).permitAll()
-            
-            // ✅ IMPORTANT: Allow all /auth and /users endpoints
-            .antMatchers("/auth/**").permitAll()
-            .antMatchers("/users/**").permitAll()  // 👈 Ye add karo
-            .antMatchers("/actuator/**").permitAll()
-            
-            // Rest all authenticated (optional - ab koi aur endpoint nahi hai)
-            .anyRequest().authenticated();
+                .csrf().disable()
+                .cors().disable()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .authorizeRequests()
+
+                // Allow browser preflight requests
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // Public endpoints - Swagger
+                .antMatchers(
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/swagger-resources/**",
+                        "/webjars/**")
+                .permitAll()
+
+                // ✅ IMPORTANT: Allow all /auth and /users endpoints
+                .antMatchers("/auth/**").permitAll()
+                .antMatchers("/users/**").permitAll()
+                .antMatchers("/superadmin/**").permitAll() // ⭐ Super Admin APIs
+                .antMatchers("/actuator/**").permitAll()
+
+                .anyRequest().authenticated();
     }
 }
-

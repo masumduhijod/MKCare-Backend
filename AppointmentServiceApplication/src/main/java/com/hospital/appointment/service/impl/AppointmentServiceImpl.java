@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -423,21 +424,44 @@ public List<AppointmentSummaryDTO> getTodaysAppointments() {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AppointmentDTO> getAppointmentsByStatus(String status) {
-        // TODO: Implement
-        return null;
+        log.info("Fetching appointments by status: {}", status);
+        try {
+            Appointment.AppointmentStatus appointmentStatus =
+                    Appointment.AppointmentStatus.valueOf(status.toUpperCase());
+            List<Appointment> appointments =
+                    appointmentRepository.findByStatusOrderByAppointmentDateDescAppointmentTimeDesc(appointmentStatus);
+            return appointments.stream()
+                    .map(apt -> mapToDTO(apt, null, null))
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid appointment status: {}", status);
+            return Collections.emptyList();
+        }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AppointmentSummaryDTO> searchAppointments(String searchTerm) {
-        // TODO: Implement
-        return null;
+        log.info("Searching appointments for term: {}", searchTerm);
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Appointment> appointments = appointmentRepository.searchAppointments(searchTerm.trim());
+        return appointments.stream()
+                .map(this::mapToSummaryDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AppointmentSummaryDTO> getAppointmentsByDateRange(LocalDate startDate, LocalDate endDate) {
-        // TODO: Implement
-        return null;
+        log.info("Fetching appointments from {} to {}", startDate, endDate);
+        List<Appointment> appointments = appointmentRepository.findByDateRange(startDate, endDate);
+        return appointments.stream()
+                .map(this::mapToSummaryDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
