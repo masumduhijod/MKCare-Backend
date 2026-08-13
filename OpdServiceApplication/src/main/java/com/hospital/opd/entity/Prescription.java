@@ -78,6 +78,12 @@ public class Prescription {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
+
+    @Column(name = "modified_by", length = 100)
+    private String modifiedBy;
+
     // Enum
     public enum PrescriptionStatus {
         ACTIVE,

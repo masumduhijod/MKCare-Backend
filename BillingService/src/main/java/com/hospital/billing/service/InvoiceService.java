@@ -18,6 +18,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,8 +33,16 @@ public class InvoiceService {
     
     public InvoiceDTO createInvoice(CreateInvoiceDTO dto) {
         log.info("Creating invoice for PIN: {}", dto.getPinNumber());
-        System.out.println("Items size: " + dto.getItems().size());
-System.out.println("DTO Data: " + dto);
+        
+        // Check if invoice already exists for this CVR to prevent duplicates
+        if (dto.getCvrNumber() != null && !dto.getCvrNumber().isEmpty()) {
+            List<Invoice> existing = invoiceRepository.findByCvrNumberIn(java.util.Collections.singletonList(dto.getCvrNumber()));
+            if (!existing.isEmpty()) {
+                log.warn("Invoice already exists for CVR {}: {}", dto.getCvrNumber(), existing.get(0).getInvoiceNumber());
+                return mapToDTO(existing.get(0));
+            }
+        }
+
         String invoiceNumber = generateInvoiceNumber();
         
         Invoice invoice = new Invoice();
@@ -102,19 +111,23 @@ invoice.setPaymentStatus(Invoice.PaymentStatus.PENDING);
             .collect(Collectors.toList()));
         return dto;
     }
- public List<InvoiceDTO> getInvoicesByDoctorAndDate(String doctorId, String date) {
+    public List<InvoiceDTO> getInvoicesByDoctorAndDate(String doctorId, String date) {
 
-    List<Invoice> invoices =
-            invoiceRepository.findByDoctorIdAndInvoiceDate(
-                    doctorId,
-                    java.time.LocalDate.parse(date)
-            );
+        List<Invoice> invoices =
+                invoiceRepository.findByDoctorIdAndInvoiceDate(
+                        doctorId,
+                        java.time.LocalDate.parse(date)
+                );
 
-    return invoices.stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-}
+        return invoices.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
 
-
+    public List<InvoiceDTO> getInvoicesByCvrs(List<String> cvrNumbers) {
+        if (cvrNumbers == null || cvrNumbers.isEmpty()) return new ArrayList<>();
+        return invoiceRepository.findByCvrNumberIn(cvrNumbers)
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
 }
 

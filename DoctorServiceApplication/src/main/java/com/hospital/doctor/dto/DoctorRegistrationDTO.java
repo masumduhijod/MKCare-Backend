@@ -57,6 +57,7 @@ public class DoctorRegistrationDTO {
     private BigDecimal consultationFee;
     
     private BigDecimal followUpFee;
+    private Integer followUpDaysLimit;
     
     private Boolean availableForOPD;
     private Boolean availableForEmergency;

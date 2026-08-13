@@ -1,18 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.hospital.billing.controller;
 
-/**
- *
- * @author mduhijod
- */
-// ========== Controllers ==========
-
 import com.hospital.billing.dto.*;
-import com.hospital.billing.entity.Invoice;
 import com.hospital.billing.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +13,7 @@ import java.util.List;
 @RequestMapping("/billing/invoices")
 @RequiredArgsConstructor
 @Slf4j
-//@CrossOrigin(origins = "*")
-class InvoiceController {
+public class InvoiceController {
     
     private final InvoiceService invoiceService;
     
@@ -58,25 +45,29 @@ class InvoiceController {
         return ResponseEntity.ok(ApiResponse.success(invoices.size() + " pending invoice(s)", invoices));
     }
     
-@GetMapping("/doctor/{doctorId}/date/{date}")
-public ResponseEntity<ApiResponse<List<InvoiceDTO>>> 
-getInvoicesByDoctorAndDate(
-        @PathVariable String doctorId,
-        @PathVariable String date) {
+    @GetMapping("/doctor/{doctorId}/date/{date}")
+    public ResponseEntity<ApiResponse<List<InvoiceDTO>>> getInvoicesByDoctorAndDate(
+            @PathVariable String doctorId,
+            @PathVariable String date) {
+        log.info("API: Get invoices for doctor {} on date {}", doctorId, date);
+        List<InvoiceDTO> invoices = invoiceService.getInvoicesByDoctorAndDate(doctorId, date);
+        return ResponseEntity.ok(ApiResponse.success("Invoices loaded", invoices));
+    }
 
-    List<InvoiceDTO> invoices =
-            invoiceService.getInvoicesByDoctorAndDate(doctorId, date);
+    /**
+     * Search invoices by CVR numbers (Batch lookup)
+     * Using POST to handle large lists of CVRs
+     */
+    @PostMapping("/search/by-cvrs")
+    public ResponseEntity<ApiResponse<List<InvoiceDTO>>> getInvoicesByCvrs(@RequestBody List<String> cvrNumbers) {
+        log.info("API: Batch lookup invoices for {} CVRs", (cvrNumbers != null ? cvrNumbers.size() : 0));
+        List<InvoiceDTO> invoices = invoiceService.getInvoicesByCvrs(cvrNumbers);
+        return ResponseEntity.ok(ApiResponse.success("Invoices fetched successfully", invoices));
+    }
 
-    return ResponseEntity.ok(
-            ApiResponse.success("Invoices loaded", invoices)
-    );
+    @GetMapping("/by-pin/{pin}")
+    public ResponseEntity<ApiResponse<List<InvoiceDTO>>> getByPin(@PathVariable String pin) {
+        List<InvoiceDTO> invoices = invoiceService.getPatientInvoices(pin);
+        return ResponseEntity.ok(ApiResponse.success("Invoices for patient", invoices));
+    }
 }
-
-
-@GetMapping("/by-pin/{pin}")
-public List<InvoiceDTO> getByPin(@PathVariable String pin) {
-    return invoiceService.getPatientInvoices(pin);
-}
-
-}
-

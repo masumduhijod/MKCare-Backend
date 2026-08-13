@@ -8,7 +8,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.List;
+import java.util.*;
 
 /**
  * Super Admin Controller
@@ -92,6 +92,24 @@ public class SuperAdminController {
         log.info("🔍 Validating clinic by tenantId: {}", tenantId);
         try {
             ClinicDTO clinic = superAdminService.getClinicByTenantId(tenantId);
+
+            // ✅ CHECK 1: Is clinic active?
+            if (!clinic.isActive()) {
+                log.warn("❌ Clinic {} is INACTIVE", tenantId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(ApiResponse.error("Clinic is currently turned OFF. Please contact your Super Admin."));
+            }
+
+            // ✅ CHECK 2: Is subscription expired?
+            if (clinic.getSubscriptionExpiry() != null &&
+                    clinic.getSubscriptionExpiry().isBefore(java.time.LocalDateTime.now())) {
+                String expiredAt = clinic.getSubscriptionExpiry()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm a"));
+                log.warn("❌ Clinic {} subscription expired at {}", tenantId, expiredAt);
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                        .body(ApiResponse.error("Subscription Expired! Your clinic plan ended on " + expiredAt + ". Please contact your Super Admin to renew."));
+            }
+
             return ResponseEntity.ok(ApiResponse.success("Clinic found", clinic));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -165,6 +183,100 @@ public class SuperAdminController {
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("Failed to create admin: " + e.getMessage()));
+        }
+    }
+
+    // =====================================================================
+    // 9. RENEW/UPDATE CLINIC SUBSCRIPTION
+    // =====================================================================
+    @PostMapping("/superadmin/clinics/{tenantId}/renew")
+    public ResponseEntity<ApiResponse<ClinicDTO>> renewClinicSubscription(
+            @PathVariable String tenantId, @RequestBody ClinicDTO clinicDTO) {
+        log.info("📅 Renewing/Updating subscription for clinic: {}", tenantId);
+        try {
+            ClinicDTO updated = superAdminService.renewClinicSubscription(tenantId, clinicDTO);
+            return ResponseEntity.ok(ApiResponse.success("Clinic subscription updated successfully", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Failed to renew subscription: " + e.getMessage()));
+        }
+    }
+    // =====================================================================
+    // 10. RBAC: GET ALL ROLES
+    // =====================================================================
+    @GetMapping("/superadmin/roles")
+    public ResponseEntity<ApiResponse<List<String>>> getAllRoles() {
+        log.info("📋 Fetching all user roles");
+        return ResponseEntity.ok(ApiResponse.success("Roles fetched", superAdminService.getAllRoles()));
+    }
+
+    // =====================================================================
+    // 11. RBAC: GET ALL MODULES
+    // =====================================================================
+    @GetMapping("/superadmin/modules")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllModules() {
+        log.info("📋 Fetching all system modules");
+        return ResponseEntity.ok(ApiResponse.success("Modules fetched", superAdminService.getAllModules()));
+    }
+
+    // =====================================================================
+    // 12. RBAC: GET PERMISSIONS FOR A ROLE
+    // =====================================================================
+    @GetMapping("/superadmin/role-permissions/{roleName}")
+    public ResponseEntity<ApiResponse<List<String>>> getRolePermissions(@PathVariable String roleName) {
+        log.info("🔍 Fetching permissions for role: {}", roleName);
+        return ResponseEntity.ok(ApiResponse.success("Permissions fetched", superAdminService.getRolePermissions(roleName)));
+    }
+
+    // =====================================================================
+    // 13. RBAC: UPDATE ROLE PERMISSIONS
+    // =====================================================================
+    @PostMapping("/superadmin/role-permissions/{roleName}")
+    public ResponseEntity<ApiResponse<String>> updateRolePermissions(
+            @PathVariable String roleName, @RequestBody List<String> moduleCodes) {
+        log.info("📝 Updating permissions for role: {}", roleName);
+        try {
+            superAdminService.updateRolePermissions(roleName, moduleCodes);
+            return ResponseEntity.ok(ApiResponse.success("Permissions updated successfully", roleName));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Failed to update permissions: " + e.getMessage()));
+        }
+    }
+
+    // =====================================================================
+    // 14. RBAC: GET USERS FOR A CLINIC
+    // =====================================================================
+    @GetMapping("/superadmin/clinics/{tenantId}/users")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getClinicUsers(@PathVariable String tenantId) {
+        log.info("👥 Request to fetch users for clinic: {}", tenantId);
+        return ResponseEntity.ok(ApiResponse.success("Users fetched", superAdminService.getClinicUsers(tenantId)));
+    }
+
+    // =====================================================================
+    // 15. RBAC: GET PERMISSIONS FOR A SPECIFIC USER
+    // =====================================================================
+    @GetMapping("/superadmin/clinics/{tenantId}/users/{userId}/permissions")
+    public ResponseEntity<ApiResponse<List<String>>> getUserPermissions(
+            @PathVariable String tenantId, @PathVariable Long userId) {
+        log.info("🔍 Request to fetch permissions for User ID {} in Clinic {}", userId, tenantId);
+        return ResponseEntity.ok(ApiResponse.success("User permissions fetched", 
+                superAdminService.getUserPermissions(tenantId, userId)));
+    }
+
+    // =====================================================================
+    // 16. RBAC: UPDATE USER PERMISSIONS
+    // =====================================================================
+    @PostMapping("/superadmin/clinics/{tenantId}/users/{userId}/permissions")
+    public ResponseEntity<ApiResponse<String>> updateUserPermissions(
+            @PathVariable String tenantId, @PathVariable Long userId, @RequestBody List<String> moduleCodes) {
+        log.info("📝 Request to update permissions for User ID {} in Clinic {}", userId, tenantId);
+        try {
+            superAdminService.updateUserPermissions(tenantId, userId, moduleCodes);
+            return ResponseEntity.ok(ApiResponse.success("User permissions updated successfully", tenantId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Failed to update user permissions: " + e.getMessage()));
         }
     }
 }

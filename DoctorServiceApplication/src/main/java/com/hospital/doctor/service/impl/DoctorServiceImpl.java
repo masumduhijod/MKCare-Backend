@@ -106,6 +106,7 @@ public class DoctorServiceImpl implements DoctorService {
         doctor.setBio(registrationDTO.getBio());
         doctor.setLanguagesSpoken(registrationDTO.getLanguagesSpoken());
         doctor.setRoomNumber(registrationDTO.getRoomNumber());
+        doctor.setFollowUpDaysLimit(registrationDTO.getFollowUpDaysLimit());
 
         Doctor updatedDoctor = doctorRepository.save(doctor);
         log.info("Doctor updated successfully: {}", doctorId);

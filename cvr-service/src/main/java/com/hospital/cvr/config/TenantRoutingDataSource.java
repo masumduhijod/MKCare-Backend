@@ -83,7 +83,7 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
                 
                 HikariDataSource dataSource = new HikariDataSource();
                 dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/" + tenant.getDbName() + 
-                                     "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
+                                     "?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true");
                 dataSource.setUsername("root");
                 dataSource.setPassword("Pass@123");
                 dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
@@ -94,6 +94,10 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
                 dataSource.setMaxLifetime(1800000);
                 
                 tenantDataSources.put(tenantId, dataSource);
+                
+                // ⭐ AUTOMATIC SCHEMA UPDATE
+                ensureSchemaUpdated(dataSource, tenant.getDbName());
+                
                 setTargetDataSources(tenantDataSources);
                 afterPropertiesSet();
                 
@@ -103,5 +107,28 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
         
         return (DataSource) tenantDataSources.get(tenantId);
     }
-}
 
+    private void ensureSchemaUpdated(DataSource dataSource, String dbName) {
+        JdbcTemplate jt = new JdbcTemplate(dataSource);
+        System.out.println("🚀 Running automatic schema migration for: " + dbName);
+        try {
+            addColumnIfNotExists(jt, dbName, "case_visit_records", "op_case_number", "VARCHAR(20) NULL");
+            System.out.println("✅ Schema migration completed for: " + dbName);
+        } catch (Exception e) {
+            System.err.println("⚠️ Schema migration failed for " + dbName + ": " + e.getMessage());
+        }
+    }
+
+    private void addColumnIfNotExists(JdbcTemplate jt, String dbName, String tableName, String columnName, String definition) {
+        String checkSql = "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        Integer count = jt.queryForObject(checkSql, Integer.class, dbName, tableName, columnName);
+        if (count == null || count == 0) {
+            System.out.println("➕ Adding column " + columnName + " to " + tableName);
+            try {
+                jt.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+            } catch (Exception e) {
+                System.err.println("⚠️ Could not add column " + columnName + ": " + e.getMessage());
+            }
+        }
+    }
+}

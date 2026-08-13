@@ -115,6 +115,39 @@ public class UserService {
         response.setClinicLogo((String) tenantInfo.get("logo_path"));
         response.setClinicAddress((String) tenantInfo.get("address"));
         response.setClinicPhone((String) tenantInfo.get("phone"));
+        
+        // ⭐ RBAC: Fetch permissions (User-specific override first, then Role-based)
+        try {
+            // 1. Check for User-specific permissions in Master DB
+            List<String> userPerms = masterJdbcTemplate.queryForList(
+                "SELECT module_code FROM user_module_mapping WHERE tenant_id = ? AND user_id = ?", 
+                String.class, response.getTenantId(), user.getUserId());
+            
+            if (!userPerms.isEmpty()) {
+                response.setPermissions(userPerms);
+                log.info("✅ User-specific permissions loaded for {}: {}", user.getUsername(), userPerms);
+            } else {
+                // 2. Check for Clinic-specific Role permissions
+                List<String> clinicRolePerms = masterJdbcTemplate.queryForList(
+                    "SELECT module_code FROM role_module_mapping WHERE role_name = ? AND tenant_id = ?", 
+                    String.class, user.getRole().name(), response.getTenantId());
+                
+                if (!clinicRolePerms.isEmpty()) {
+                    response.setPermissions(clinicRolePerms);
+                    log.info("✅ Clinic-specific Role permissions loaded for {}: {}", user.getRole().name(), clinicRolePerms);
+                } else {
+                    // 3. Fallback to Global Role-based permissions (tenant_id IS NULL)
+                    List<String> globalRolePerms = masterJdbcTemplate.queryForList(
+                        "SELECT module_code FROM role_module_mapping WHERE role_name = ? AND tenant_id IS NULL", 
+                        String.class, user.getRole().name());
+                    response.setPermissions(globalRolePerms);
+                    log.info("✅ Global Role-based permissions loaded for {}: {}", user.getRole().name(), globalRolePerms);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Could not load permissions for user {}: {}", user.getUsername(), e.getMessage());
+            response.setPermissions(new java.util.ArrayList<>());
+        }
 
         log.info("✅ Login successful - User: {} at Clinic: {}", user.getUsername(), tenantInfo.get("clinic_name"));
         return response;
@@ -303,5 +336,69 @@ public class UserService {
         userRepository.save(user);
 
         log.info("Password reset successfully for user: {}", username);
+    }
+
+    // =====================================================================
+    // ⭐ RBAC: ROLE & MODULE MANAGEMENT (For Clinic Admins)
+    // =====================================================================
+
+    public List<String> getRoles() {
+        return java.util.Arrays.stream(User.UserRole.values())
+                .map(Enum::name)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<Map<String, Object>> getModules() {
+        return masterJdbcTemplate.queryForList("SELECT * FROM modules ORDER BY module_name ASC");
+    }
+
+    public List<String> getRolePermissions(String roleName, String tenantId) {
+        // First check clinic-specific
+        List<String> perms = masterJdbcTemplate.queryForList(
+            "SELECT module_code FROM role_module_mapping WHERE role_name = ? AND tenant_id = ?", 
+            String.class, roleName, tenantId);
+        
+        if (perms.isEmpty()) {
+            // Fallback to global
+            perms = masterJdbcTemplate.queryForList(
+                "SELECT module_code FROM role_module_mapping WHERE role_name = ? AND tenant_id IS NULL", 
+                String.class, roleName);
+        }
+        return perms;
+    }
+
+    @Transactional
+    public void updateRolePermissions(String roleName, List<String> moduleCodes, String tenantId) {
+        log.info("📝 Updating Role Permissions for Clinic: {}, Role: {}", tenantId, roleName);
+        
+        // 1. Clear clinic-specific permissions for this role
+        masterJdbcTemplate.update("DELETE FROM role_module_mapping WHERE role_name = ? AND tenant_id = ?", 
+                                 roleName, tenantId);
+        
+        // 2. Insert new clinic-specific permissions
+        if (moduleCodes != null && !moduleCodes.isEmpty()) {
+            for (String code : moduleCodes) {
+                masterJdbcTemplate.update("INSERT INTO role_module_mapping (role_name, module_code, tenant_id) VALUES (?, ?, ?)",
+                        roleName, code, tenantId);
+            }
+        }
+    }
+
+    public List<String> getUserPermissions(String tenantId, Long userId) {
+        return masterJdbcTemplate.queryForList(
+            "SELECT module_code FROM user_module_mapping WHERE tenant_id = ? AND user_id = ?", 
+            String.class, tenantId, userId);
+    }
+
+    @Transactional
+    public void updateUserPermissions(String tenantId, Long userId, List<String> moduleCodes) {
+        masterJdbcTemplate.update("DELETE FROM user_module_mapping WHERE tenant_id = ? AND user_id = ?", 
+                                 tenantId, userId);
+        if (moduleCodes != null && !moduleCodes.isEmpty()) {
+            for (String code : moduleCodes) {
+                masterJdbcTemplate.update("INSERT INTO user_module_mapping (tenant_id, user_id, module_code) VALUES (?, ?, ?)",
+                        tenantId, userId, code);
+            }
+        }
     }
 }

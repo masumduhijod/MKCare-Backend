@@ -39,6 +39,177 @@ public class SuperAdminService {
     @Qualifier("masterJdbcTemplate")
     private JdbcTemplate masterJdbcTemplate;
 
+    /**
+     * ⭐ Automatically sync medicines table and RBAC tables for all clinics on startup
+     */
+    @javax.annotation.PostConstruct
+    public void initializeSystem() {
+        log.info("🔄 Starting global system initialization...");
+        
+        // 1. Initialize Master DB RBAC Tables
+        initializeMasterRbacTables();
+        
+        // 2. Sync medicine tables for all tenants
+        syncMedicineTableForAllClinics();
+        
+        log.info("✅ Global system initialization completed.");
+    }
+
+    private void initializeMasterRbacTables() {
+        log.info("🔐 Initializing Master RBAC tables...");
+        try {
+            
+            // Modules table
+            masterJdbcTemplate.execute("CREATE TABLE IF NOT EXISTS modules (" +
+                    "module_id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "module_name VARCHAR(100) NOT NULL, " +
+                    "module_code VARCHAR(50) UNIQUE NOT NULL, " +
+                    "description TEXT, " +
+                    "icon VARCHAR(50)" +
+                    ") ENGINE=InnoDB");
+
+            // Role-Module mapping table (Global if tenant_id is NULL, otherwise Clinic-specific)
+            masterJdbcTemplate.execute("CREATE TABLE IF NOT EXISTS role_module_mapping (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "role_name VARCHAR(50) NOT NULL, " +
+                    "module_code VARCHAR(50) NOT NULL, " +
+                    "tenant_id VARCHAR(50) DEFAULT NULL, " +
+                    "UNIQUE KEY uk_role_module_tenant (role_name, module_code, tenant_id)" +
+                    ") ENGINE=InnoDB");
+
+            // ⭐ ROBUST FIX: Add tenant_id if missing (Works on MySQL 5.7 and 8.0)
+            try {
+                // MySQL specific check for column existence
+                masterJdbcTemplate.execute("ALTER TABLE role_module_mapping ADD COLUMN tenant_id VARCHAR(50) DEFAULT NULL");
+                log.info("✅ Added missing 'tenant_id' column to role_module_mapping");
+                
+                // ⭐ Fix Index: Drop old index that didn't include tenant_id
+                try {
+                    masterJdbcTemplate.execute("ALTER TABLE role_module_mapping DROP INDEX uk_role_module");
+                    log.info("✅ Dropped old unique index 'uk_role_module'");
+                } catch (Exception ex) { /* Ignore if already dropped */ }
+                
+                // Add new tenant-aware unique index
+                try {
+                    masterJdbcTemplate.execute("ALTER TABLE role_module_mapping ADD UNIQUE KEY uk_role_module_tenant (role_name, module_code, tenant_id)");
+                    log.info("✅ Added new tenant-aware unique index 'uk_role_module_tenant'");
+                } catch (Exception ex) { /* Ignore if already exists */ }
+                
+            } catch (Exception e) {
+                // If it fails, it's likely because the column already exists
+                if (!e.getMessage().contains("Duplicate column name")) {
+                    log.warn("Note: Role table update status: {}", e.getMessage());
+                }
+            }
+
+            // User-specific Module Mapping (Per Clinic, Per User)
+            masterJdbcTemplate.execute("CREATE TABLE IF NOT EXISTS user_module_mapping (" +
+                    "mapping_id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "tenant_id VARCHAR(50) NOT NULL, " +
+                    "user_id BIGINT NOT NULL, " +
+                    "module_code VARCHAR(50) NOT NULL, " +
+                    "UNIQUE KEY (tenant_id, user_id, module_code)" +
+                    ") ENGINE=InnoDB");
+
+            try {
+                masterJdbcTemplate.execute("ALTER TABLE user_module_mapping ADD COLUMN tenant_id VARCHAR(50) DEFAULT NULL");
+                log.info("✅ Added missing 'tenant_id' column to user_module_mapping");
+            } catch (Exception e) {
+                if (!e.getMessage().contains("Duplicate column name")) {
+                    log.warn("Note: User table update status: {}", e.getMessage());
+                }
+            }
+            
+            log.info("🔐 RBAC tables initialized (Modules, Role Mapping, User Mapping).");
+
+            // Insert default modules if none exist
+            Integer moduleCount = masterJdbcTemplate.queryForObject("SELECT COUNT(*) FROM modules", Integer.class);
+            if (moduleCount == null || moduleCount == 0) {
+                log.info("📦 Inserting default modules into master DB...");
+                String[][] defaultModules = {
+                    {"Dashboard", "DASHBOARD", "fa-th-large"},
+                    {"User Management", "USER_MGMT", "fa-users-cog"},
+                    {"Patient Registration", "PATIENT_REG", "fa-user-plus"},
+                    {"Patient List", "PATIENT_LIST", "fa-users"},
+                    {"Appointment Booking", "APP_BOOKING", "fa-calendar-plus"},
+                    {"Appointment List", "APP_LIST", "fa-calendar-alt"},
+                    {"OPD Queue", "OPD_QUEUE", "fa-list-ol"},
+                    {"OPD Consultation", "OPD_CONSULT", "fa-user-md"},
+                    {"Medicine Master", "MED_MASTER", "fa-pills"},
+                    {"Billing & Invoices", "BILLING", "fa-file-invoice-dollar"},
+                    {"Payment History", "PAYMENTS", "fa-history"},
+                    {"Reports Dashboard", "REPORTS", "fa-chart-pie"}
+                };
+
+                for (String[] mod : defaultModules) {
+                    masterJdbcTemplate.update("INSERT INTO modules (module_name, module_code, icon) VALUES (?, ?, ?)",
+                            mod[0], mod[1], mod[2]);
+                }
+                
+                // Set default permissions for ADMIN (all access)
+                for (String[] mod : defaultModules) {
+                    masterJdbcTemplate.update("INSERT IGNORE INTO role_module_mapping (role_name, module_code) VALUES (?, ?)",
+                            "ADMIN", mod[1]);
+                }
+
+                // Set default permissions for DOCTOR
+                String[] doctorMods = {"DASHBOARD", "PATIENT_LIST", "OPD_QUEUE", "OPD_CONSULT", "MED_MASTER", "REPORTS"};
+                for (String code : doctorMods) {
+                    masterJdbcTemplate.update("INSERT IGNORE INTO role_module_mapping (role_name, module_code) VALUES (?, ?)",
+                            "DOCTOR", code);
+                }
+
+                // Set default permissions for RECEPTIONIST
+                String[] receptionMods = {"DASHBOARD", "PATIENT_REG", "PATIENT_LIST", "APP_BOOKING", "APP_LIST", "OPD_QUEUE", "BILLING"};
+                for (String code : receptionMods) {
+                    masterJdbcTemplate.update("INSERT IGNORE INTO role_module_mapping (role_name, module_code) VALUES (?, ?)",
+                            "RECEPTIONIST", code);
+                }
+                
+                log.info("✅ Default modules and role permissions initialized.");
+            }
+        } catch (Exception e) {
+            log.error("❌ Failed to initialize RBAC tables: {}", e.getMessage());
+        }
+    }
+
+    private void syncMedicineTableForAllClinics() {
+        try {
+            List<Map<String, Object>> tenants = masterJdbcTemplate.queryForList("SELECT tenant_id, db_name FROM tenants");
+            for (Map<String, Object> tenant : tenants) {
+                String tenantId = (String) tenant.get("tenant_id");
+                String dbName = (String) tenant.get("db_name");
+                try {
+                    log.info("📦 Syncing medicine table for Tenant: {} | DB: {}", tenantId, dbName);
+                    JdbcTemplate clinicJdbc = createClinicJdbcTemplate(dbName);
+                    clinicJdbc.execute("CREATE TABLE IF NOT EXISTS medicines (" +
+                            "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                            "medicine_name VARCHAR(255) NOT NULL, " +
+                            "generic_name VARCHAR(255), " +
+                            "brand_name VARCHAR(255), " +
+                            "composition VARCHAR(255), " +
+                            "medicine_type VARCHAR(50), " +
+                            "strength VARCHAR(50), " +
+                            "unit VARCHAR(20), " +
+                            "packaging VARCHAR(100), " +
+                            "manufacturer VARCHAR(255), " +
+                            "description TEXT, " +
+                            "is_active TINYINT(1) DEFAULT 1, " +
+                            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                            "created_by VARCHAR(100), " +
+                            "INDEX idx_medicine_name (medicine_name), " +
+                            "INDEX idx_brand_name (brand_name)" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
+                } catch (Exception e) {
+                    log.error("❌ Failed to sync medicine table for tenant {}: {}", tenantId, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Error during global sync: {}", e.getMessage());
+        }
+    }
+
     // =====================================================================
     // 1. SUPER ADMIN LOGIN
     // =====================================================================
@@ -83,6 +254,14 @@ public class SuperAdminService {
         response.setExpiresAt(LocalDateTime.now().plusHours(24));
         response.setTenantId("MASTER");
         response.setClinicName("Super Admin Portal");
+        
+        // ⭐ SUPER ADMIN gets all module access
+        try {
+            List<String> allModules = masterJdbcTemplate.queryForList("SELECT module_code FROM modules", String.class);
+            response.setPermissions(allModules);
+        } catch (Exception e) {
+            response.setPermissions(new java.util.ArrayList<>());
+        }
 
         log.info("✅ Super Admin login successful: {}", request.getUsername());
         return response;
@@ -93,7 +272,7 @@ public class SuperAdminService {
     // =====================================================================
     public List<ClinicDTO> getAllClinics() {
         String sql = "SELECT tenant_id, clinic_code, clinic_name, organization_id, operational_id, " +
-                "db_name, address, phone, email, logo_path, is_active, created_at, updated_at, created_by " +
+                "db_name, address, phone, email, logo_path, is_active, subscription_start_date, subscription_expiry, created_at, updated_at, created_by " +
                 "FROM tenants ORDER BY created_at DESC";
 
         List<Map<String, Object>> rows = masterJdbcTemplate.queryForList(sql);
@@ -119,6 +298,18 @@ public class SuperAdminService {
                 dto.setActive(((Number) isActiveObj).intValue() == 1);
             }
 
+            if (row.get("subscription_start_date") instanceof java.sql.Timestamp) {
+                dto.setSubscriptionStartDate(((java.sql.Timestamp) row.get("subscription_start_date")).toLocalDateTime());
+            } else if (row.get("subscription_start_date") instanceof LocalDateTime) {
+                dto.setSubscriptionStartDate((LocalDateTime) row.get("subscription_start_date"));
+            }
+
+            if (row.get("subscription_expiry") instanceof java.sql.Timestamp) {
+                dto.setSubscriptionExpiry(((java.sql.Timestamp) row.get("subscription_expiry")).toLocalDateTime());
+            } else if (row.get("subscription_expiry") instanceof LocalDateTime) {
+                dto.setSubscriptionExpiry((LocalDateTime) row.get("subscription_expiry"));
+            }
+
             if (row.get("created_at") instanceof java.sql.Timestamp) {
                 dto.setCreatedAt(((java.sql.Timestamp) row.get("created_at")).toLocalDateTime());
             }
@@ -135,7 +326,7 @@ public class SuperAdminService {
     // =====================================================================
     public ClinicDTO getClinicByTenantId(String tenantId) {
         String sql = "SELECT tenant_id, clinic_code, clinic_name, organization_id, operational_id, " +
-                "db_name, address, phone, email, logo_path, is_active, created_at, created_by " +
+                "db_name, address, phone, email, logo_path, is_active, subscription_start_date, subscription_expiry, created_at, created_by " +
                 "FROM tenants WHERE tenant_id = ?";
 
         Map<String, Object> row;
@@ -164,6 +355,18 @@ public class SuperAdminService {
             dto.setActive(((Number) isActiveObj).intValue() == 1);
         }
 
+        if (row.get("subscription_start_date") instanceof java.sql.Timestamp) {
+            dto.setSubscriptionStartDate(((java.sql.Timestamp) row.get("subscription_start_date")).toLocalDateTime());
+        } else if (row.get("subscription_start_date") instanceof LocalDateTime) {
+            dto.setSubscriptionStartDate((LocalDateTime) row.get("subscription_start_date"));
+        }
+
+        if (row.get("subscription_expiry") instanceof java.sql.Timestamp) {
+            dto.setSubscriptionExpiry(((java.sql.Timestamp) row.get("subscription_expiry")).toLocalDateTime());
+        } else if (row.get("subscription_expiry") instanceof LocalDateTime) {
+            dto.setSubscriptionExpiry((LocalDateTime) row.get("subscription_expiry"));
+        }
+
         return dto;
     }
 
@@ -172,7 +375,7 @@ public class SuperAdminService {
     // =====================================================================
     public ClinicDTO getClinicByCode(String clinicCode) {
         String sql = "SELECT tenant_id, clinic_code, clinic_name, organization_id, operational_id, " +
-                "db_name, address, phone, email, logo_path, is_active " +
+                "db_name, address, phone, email, logo_path, is_active, subscription_start_date, subscription_expiry " +
                 "FROM tenants WHERE clinic_code = ? AND is_active = TRUE";
 
         Map<String, Object> row;
@@ -193,6 +396,16 @@ public class SuperAdminService {
         dto.setPhone((String) row.get("phone"));
         dto.setEmail((String) row.get("email"));
         dto.setLogoPath((String) row.get("logo_path"));
+        if (row.get("subscription_start_date") instanceof java.sql.Timestamp) {
+            dto.setSubscriptionStartDate(((java.sql.Timestamp) row.get("subscription_start_date")).toLocalDateTime());
+        } else if (row.get("subscription_start_date") instanceof LocalDateTime) {
+            dto.setSubscriptionStartDate((LocalDateTime) row.get("subscription_start_date"));
+        }
+        if (row.get("subscription_expiry") instanceof java.sql.Timestamp) {
+            dto.setSubscriptionExpiry(((java.sql.Timestamp) row.get("subscription_expiry")).toLocalDateTime());
+        } else if (row.get("subscription_expiry") instanceof LocalDateTime) {
+            dto.setSubscriptionExpiry((LocalDateTime) row.get("subscription_expiry"));
+        }
         dto.setActive(true);
 
         return dto;
@@ -244,8 +457,19 @@ public class SuperAdminService {
 
         // Step 3: Insert tenant record in master DB
         String insertSql = "INSERT INTO tenants (tenant_id, clinic_code, clinic_name, organization_id, " +
-                "operational_id, db_name, address, phone, email, logo_path, created_by) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "operational_id, db_name, address, phone, email, logo_path, created_by, subscription_start_date, subscription_expiry) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        // Handle user-provided dates or defaults
+        LocalDateTime startDate = clinicDTO.getSubscriptionStartDate() != null ? 
+                                 clinicDTO.getSubscriptionStartDate() : 
+                                 LocalDateTime.now();
+        clinicDTO.setSubscriptionStartDate(startDate);
+
+        LocalDateTime expiry = clinicDTO.getSubscriptionExpiry() != null ? 
+                               clinicDTO.getSubscriptionExpiry() : 
+                               startDate.plusDays(30);
+        clinicDTO.setSubscriptionExpiry(expiry);
 
         masterJdbcTemplate.update(insertSql,
                 clinicDTO.getTenantId(),
@@ -258,7 +482,9 @@ public class SuperAdminService {
                 clinicDTO.getPhone(),
                 clinicDTO.getEmail(),
                 clinicDTO.getLogoPath(),
-                clinicDTO.getCreatedBy());
+                clinicDTO.getCreatedBy(),
+                startDate,
+                expiry);
 
         log.info("✅ Tenant record created: {}", clinicDTO.getTenantId());
 
@@ -282,7 +508,7 @@ public class SuperAdminService {
         log.info("📝 Updating clinic: {}", tenantId);
 
         String sql = "UPDATE tenants SET clinic_name = ?, organization_id = ?, operational_id = ?, " +
-                "address = ?, phone = ?, email = ?, logo_path = ?, updated_at = NOW() WHERE tenant_id = ?";
+                "address = ?, phone = ?, email = ?, logo_path = ?, subscription_start_date = ?, subscription_expiry = ?, updated_at = NOW() WHERE tenant_id = ?";
 
         int rows = masterJdbcTemplate.update(sql,
                 clinicDTO.getClinicName(),
@@ -292,6 +518,8 @@ public class SuperAdminService {
                 clinicDTO.getPhone(),
                 clinicDTO.getEmail(),
                 clinicDTO.getLogoPath(),
+                clinicDTO.getSubscriptionStartDate(),
+                clinicDTO.getSubscriptionExpiry(),
                 tenantId);
 
         if (rows == 0) {
@@ -321,6 +549,23 @@ public class SuperAdminService {
         ClinicDTO clinic = getClinicByTenantId(tenantId);
         createClinicAdmin(clinic.getDbName(), adminDto);
         log.info("✅ Admin user created for clinic: {}", tenantId);
+    }
+
+    // =====================================================================
+    // 9. RENEW/UPDATE CLINIC SUBSCRIPTION
+    // =====================================================================
+    public ClinicDTO renewClinicSubscription(String tenantId, ClinicDTO dto) {
+        log.info("📅 Renewing/Updating subscription for clinic: {}", tenantId);
+        
+        String sql = "UPDATE tenants SET subscription_expiry = ?, updated_at = NOW() WHERE tenant_id = ?";
+        int rows = masterJdbcTemplate.update(sql, dto.getSubscriptionExpiry(), tenantId);
+
+        if (rows == 0) {
+            throw new RuntimeException("Clinic not found: " + tenantId);
+        }
+
+        log.info("✅ Clinic subscription updated: {}", tenantId);
+        return getClinicByTenantId(tenantId);
     }
 
     // =====================================================================
@@ -739,13 +984,13 @@ public class SuperAdminService {
             "is_active TINYINT(1) DEFAULT NULL, " +
             "break_start_time TIME DEFAULT NULL, " +
             "break_end_time TIME DEFAULT NULL, " +
-            "UNIQUE KEY UK_ds_doctor_date (doctor_id, schedule_date), " +
             "CONSTRAINT FK_ds_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(id)" +
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
 
     clinicJdbc.execute("CREATE TABLE IF NOT EXISTS case_visit_records (" +
             "cvr_id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "cvr_number VARCHAR(20) NOT NULL, " +
+            "op_case_number VARCHAR(20) DEFAULT NULL, " +
             "patient_id BIGINT NOT NULL, " +
             "pin_number VARCHAR(20) NOT NULL, " +
             "appointment_id VARCHAR(20) DEFAULT NULL, " +
@@ -888,6 +1133,8 @@ public class SuperAdminService {
             "instructions TEXT, " +
             "status VARCHAR(255) NOT NULL, " +
             "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+            "created_by VARCHAR(100) DEFAULT NULL, " +
+            "modified_by VARCHAR(100) DEFAULT NULL, " +
             "UNIQUE KEY UK_prescriptions_id (prescription_id), " +
             "KEY idx_prescriptions_patient (patient_id), " +
             "KEY idx_prescriptions_doctor (doctor_id)" +
@@ -895,7 +1142,12 @@ public class SuperAdminService {
 
     clinicJdbc.execute("CREATE TABLE IF NOT EXISTS prescription_items (" +
             "item_id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
-            "prescription_id BIGINT NOT NULL, " +
+            "prescription_id_fk BIGINT NOT NULL, " +
+            "prescription_id VARCHAR(20) DEFAULT NULL, " +
+            "pin_number VARCHAR(20) DEFAULT NULL, " +
+            "cvr_number VARCHAR(20) DEFAULT NULL, " +
+            "cvr_date DATE DEFAULT NULL, " +
+            "cvr_time TIME DEFAULT NULL, " +
             "medicine_name VARCHAR(255) NOT NULL, " +
             "dosage VARCHAR(100) NOT NULL, " +
             "frequency VARCHAR(100) NOT NULL, " +
@@ -908,7 +1160,11 @@ public class SuperAdminService {
             "night TINYINT(1) DEFAULT NULL, " +
             "before_food TINYINT(1) DEFAULT NULL, " +
             "after_food TINYINT(1) DEFAULT NULL, " +
-            "CONSTRAINT FK_presc_items_presc FOREIGN KEY (prescription_id) REFERENCES prescriptions(id)" +
+            "created_by VARCHAR(100) DEFAULT NULL, " +
+            "created_on DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "modify_by VARCHAR(100) DEFAULT NULL, " +
+            "modify_on DATETIME DEFAULT NULL, " +
+            "CONSTRAINT FK_pi_prescription FOREIGN KEY (prescription_id_fk) REFERENCES prescriptions(id) ON DELETE CASCADE" +
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
 
     clinicJdbc.execute("CREATE TABLE IF NOT EXISTS invoices (" +
@@ -969,22 +1225,28 @@ public class SuperAdminService {
             "CONSTRAINT FK_payments_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id)" +
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
 
-//    clinicJdbc.execute("CREATE TABLE IF NOT EXISTS roles (" +
-//            "role_id INT AUTO_INCREMENT PRIMARY KEY, " +
-//            "role_name VARCHAR(50) NOT NULL, " +
-//            "description TEXT, " +
-//            "UNIQUE KEY UK_roles_name (role_name)" +
-//            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
-//
-//    clinicJdbc.execute("CREATE TABLE IF NOT EXISTS permissions (" +
-//            "permission_id INT AUTO_INCREMENT PRIMARY KEY, " +
-//            "permission_name VARCHAR(100) NOT NULL, " +
-//            "module VARCHAR(50) NOT NULL, " +
-//            "description TEXT, " +
-//            "UNIQUE KEY UK_permissions_name (permission_name)" +
-//            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
+    // Medicine Master Table
+    clinicJdbc.execute("CREATE TABLE IF NOT EXISTS medicines (" +
+            "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+            "medicine_name VARCHAR(255) NOT NULL, " +
+            "generic_name VARCHAR(255), " +
+            "brand_name VARCHAR(255), " +
+            "composition VARCHAR(255), " +
+            "medicine_type VARCHAR(50), " +
+            "strength VARCHAR(50), " +
+            "unit VARCHAR(20), " +
+            "packaging VARCHAR(100), " +
+            "manufacturer VARCHAR(255), " +
+            "description TEXT, " +
+            "is_active TINYINT(1) DEFAULT 1, " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+            "created_by VARCHAR(100), " +
+            "INDEX idx_medicine_name (medicine_name), " +
+            "INDEX idx_brand_name (brand_name)" +
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
 
-    log.info("✅ All 16 tables created in database: {}", dbName);
+    log.info("✅ All 17 tables created in database: {}", dbName);
 }
     // =====================================================================
     // HELPER: Create admin user in clinic database
@@ -1028,6 +1290,50 @@ public class SuperAdminService {
     }
 
     // =====================================================================
+    // 10. RBAC: GET ALL MODULES
+    // =====================================================================
+    public List<Map<String, Object>> getAllModules() {
+        return masterJdbcTemplate.queryForList("SELECT * FROM modules ORDER BY module_id ASC");
+    }
+
+    // =====================================================================
+    // 11. RBAC: GET PERMISSIONS FOR A ROLE
+    // =====================================================================
+    public List<String> getRolePermissions(String roleName) {
+        String sql = "SELECT module_code FROM role_module_mapping WHERE role_name = ?";
+        return masterJdbcTemplate.queryForList(sql, String.class, roleName.toUpperCase());
+    }
+
+    // =====================================================================
+    // 12. RBAC: UPDATE ROLE PERMISSIONS
+    // =====================================================================
+    @Transactional
+    public void updateRolePermissions(String roleName, List<String> moduleCodes) {
+        log.info("🔐 Updating permissions for role: {} | Modules: {}", roleName, moduleCodes);
+        
+        // 1. Delete existing mappings
+        masterJdbcTemplate.update("DELETE FROM role_module_mapping WHERE role_name = ?", roleName.toUpperCase());
+        
+        // 2. Insert new mappings
+        if (moduleCodes != null && !moduleCodes.isEmpty()) {
+            for (String code : moduleCodes) {
+                masterJdbcTemplate.update("INSERT INTO role_module_mapping (role_name, module_code) VALUES (?, ?)",
+                        roleName.toUpperCase(), code);
+            }
+        }
+        log.info("✅ Permissions updated for role: {}", roleName);
+    }
+
+    // =====================================================================
+    // 13. GET ALL ROLES
+    // =====================================================================
+    public List<String> getAllRoles() {
+        return Arrays.stream(User.UserRole.values())
+                .map(Enum::name)
+                .collect(Collectors.toList());
+    }
+
+    // =====================================================================
     // HELPER: Create JdbcTemplate for a specific clinic database
     // =====================================================================
     private JdbcTemplate createClinicJdbcTemplate(String dbName) {
@@ -1039,5 +1345,55 @@ public class SuperAdminService {
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
         ds.setMaximumPoolSize(2);
         return new JdbcTemplate(ds);
+    }
+
+    // =====================================================================
+    // 14. RBAC: GET USERS FOR A CLINIC
+    // =====================================================================
+    public List<Map<String, Object>> getClinicUsers(String tenantId) {
+        log.info("👥 Fetching users for clinic: {}", tenantId);
+        
+        // 1. Get database name
+        ClinicDTO clinic = getClinicByTenantId(tenantId);
+        String dbName = clinic.getDbName();
+        
+        // 2. Query users from clinic DB using schema prefix
+        String sql = "SELECT user_id, username, email, role, first_name, last_name, status FROM `" + dbName + "`.users";
+        
+        try {
+            return masterJdbcTemplate.queryForList(sql);
+        } catch (Exception e) {
+            log.error("❌ Failed to fetch users for clinic {}: {}", tenantId, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // =====================================================================
+    // 15. RBAC: GET PERMISSIONS FOR A SPECIFIC USER
+    // =====================================================================
+    public List<String> getUserPermissions(String tenantId, Long userId) {
+        log.info("🔍 Fetching permissions for User ID {} in Clinic {}", userId, tenantId);
+        String sql = "SELECT module_code FROM user_module_mapping WHERE tenant_id = ? AND user_id = ?";
+        return masterJdbcTemplate.queryForList(sql, String.class, tenantId, userId);
+    }
+
+    // =====================================================================
+    // 16. RBAC: UPDATE USER PERMISSIONS
+    // =====================================================================
+    @Transactional
+    public void updateUserPermissions(String tenantId, Long userId, List<String> moduleCodes) {
+        log.info("📝 Updating permissions for User ID {} in Clinic {}", userId, tenantId);
+        
+        // 1. Clear existing
+        masterJdbcTemplate.update("DELETE FROM user_module_mapping WHERE tenant_id = ? AND user_id = ?", 
+                                 tenantId, userId);
+        
+        // 2. Insert new
+        if (moduleCodes != null && !moduleCodes.isEmpty()) {
+            for (String code : moduleCodes) {
+                masterJdbcTemplate.update("INSERT INTO user_module_mapping (tenant_id, user_id, module_code) VALUES (?, ?, ?)",
+                        tenantId, userId, code);
+            }
+        }
     }
 }

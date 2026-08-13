@@ -18,6 +18,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import javax.persistence.*;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
@@ -35,9 +38,36 @@ public class PrescriptionItem {
     private Long itemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prescription_id", nullable = false)
+    @JoinColumn(name = "prescription_id_fk", nullable = false)
     @JsonIgnore
     private Prescription prescription;
+
+    @Column(name = "prescription_id", length = 20)
+    private String prescriptionId;
+
+    @Column(name = "pin_number", length = 20)
+    private String pinNumber;
+
+    @Column(name = "cvr_number", length = 20)
+    private String cvrNumber;
+
+    @Column(name = "cvr_date")
+    private LocalDate cvrDate;
+
+    @Column(name = "cvr_time")
+    private LocalTime cvrTime;
+
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
+
+    @Column(name = "created_on")
+    private LocalDateTime createdOn;
+
+    @Column(name = "modify_by", length = 100)
+    private String modifyBy;
+
+    @Column(name = "modify_on")
+    private LocalDateTime modifyOn;
 
 //    @NotBlank(message = "Medicine name is required")
     @Column(name = "medicine_name", nullable = false)
@@ -96,5 +126,20 @@ public class PrescriptionItem {
         if (beforeFood) return "Before food";
         if (afterFood) return "After food";
         return "Any time";
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdOn == null) {
+            createdOn = LocalDateTime.now();
+        }
+        if (modifyOn == null) {
+            modifyOn = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        modifyOn = LocalDateTime.now();
     }
 }

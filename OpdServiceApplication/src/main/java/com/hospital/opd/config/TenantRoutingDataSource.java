@@ -83,7 +83,7 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
 
                 HikariDataSource dataSource = new HikariDataSource();
                 dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/" + tenant.getDbName() +
-                        "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
+                        "?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true");
                 dataSource.setUsername("root");
                 dataSource.setPassword("Pass@123");
                 dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
@@ -99,6 +99,9 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
 
                 System.out.println(
                         "✅ Connected to database: " + tenant.getDbName() + " for clinic: " + tenant.getClinicName());
+
+                // (Auto-schema logic removed as requested)
+
                 // ⭐ Load database names into resolver
                 try {
                     DatabaseNameResolver resolver = new DatabaseNameResolver();
@@ -111,4 +114,6 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
 
         return (DataSource) tenantDataSources.get(tenantId);
     }
+
+
 }

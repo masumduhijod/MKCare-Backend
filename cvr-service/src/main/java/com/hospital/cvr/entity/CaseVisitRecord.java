@@ -191,6 +191,9 @@ public class CaseVisitRecord {
     @Column(name = "cvr_number", unique = true, nullable = false, length = 20)
     private String cvrNumber;
 
+    @Column(name = "op_case_number", length = 20)
+    private String opCaseNumber;
+
 //    @NotNull(message = "Patient ID is required")
     @Column(name = "patient_id", nullable = false)
     private Long patientId;

@@ -83,7 +83,7 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
                 
                 HikariDataSource dataSource = new HikariDataSource();
                 dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/" + tenant.getDbName() + 
-                                     "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
+                                     "?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true");
                 dataSource.setUsername("root");
                 dataSource.setPassword("Pass@123");
                 dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");

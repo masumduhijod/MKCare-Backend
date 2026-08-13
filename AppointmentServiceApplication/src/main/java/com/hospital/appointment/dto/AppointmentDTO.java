@@ -54,6 +54,7 @@ public class AppointmentDTO {
     
     private String symptoms;
     private String notes;
+    private String opCaseNumber;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

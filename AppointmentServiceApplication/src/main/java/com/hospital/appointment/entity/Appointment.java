@@ -90,6 +90,9 @@ public class Appointment {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "op_case_number", length = 20)
+    private String opCaseNumber;
+
     // Timestamps
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

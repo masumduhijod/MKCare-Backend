@@ -29,8 +29,9 @@ public class ReportService {
             String fromDate, String toDate, String status) {
         try {
             List<PatientDTO> patients = patientClient.getAllActivePatients().getData();
-            if (patients == null)
+            if (patients == null) {
                 patients = Collections.emptyList();
+            }
 
             // Filter by status if provided
             if (status != null && !status.isEmpty()) {
@@ -44,8 +45,8 @@ public class ReportService {
             if (fromDate != null && toDate != null) {
                 patients = patients.stream()
                         .filter(p -> p.getRegistrationDate() != null
-                                && p.getRegistrationDate().toString().compareTo(fromDate) >= 0
-                                && p.getRegistrationDate().toString().compareTo(toDate) <= 0)
+                        && p.getRegistrationDate().toString().compareTo(fromDate) >= 0
+                        && p.getRegistrationDate().toString().compareTo(toDate) <= 0)
                         .collect(Collectors.toList());
             }
 
@@ -70,8 +71,9 @@ public class ReportService {
     public ReportResponse<Map<String, Object>> getPatientDemographicsReport() {
         try {
             List<PatientDTO> patients = patientClient.getAllActivePatients().getData();
-            if (patients == null)
+            if (patients == null) {
                 patients = Collections.emptyList();
+            }
 
             Map<String, Object> demographics = new LinkedHashMap<>();
 
@@ -164,8 +166,9 @@ public class ReportService {
     public ReportResponse<OpdDailyReportDTO> getOpdDailyReport(String date) {
         try {
             List<CvrSummaryDTO> cvrList = cvrClient.getCVRsByDate(date).getData();
-            if (cvrList == null)
+            if (cvrList == null) {
                 cvrList = Collections.emptyList();
+            }
 
             Map<String, Long> departmentWise = cvrList.stream()
                     .collect(Collectors.groupingBy(
@@ -183,7 +186,7 @@ public class ReportService {
                     .totalPatients((int) cvrList.stream().map(CvrSummaryDTO::getPinNumber).distinct().count())
                     .pendingCVRs((int) cvrList.stream()
                             .filter(c -> "PENDING".equalsIgnoreCase(c.getStatus())
-                                    || "REGISTERED".equalsIgnoreCase(c.getStatus()))
+                            || "REGISTERED".equalsIgnoreCase(c.getStatus()))
                             .count())
                     .completedCVRs(
                             (int) cvrList.stream().filter(c -> "COMPLETED".equalsIgnoreCase(c.getStatus())).count())
@@ -209,8 +212,9 @@ public class ReportService {
             // Get appointments in range for department data
             List<AppointmentSummaryDTO> appointments = appointmentClient.getAppointmentsByDateRange(fromDate, toDate)
                     .getData();
-            if (appointments == null)
+            if (appointments == null) {
                 appointments = Collections.emptyList();
+            }
 
             Map<String, List<AppointmentSummaryDTO>> byDept = appointments.stream()
                     .collect(Collectors.groupingBy(
@@ -253,8 +257,9 @@ public class ReportService {
         try {
             List<AppointmentSummaryDTO> appointments = appointmentClient.getAppointmentsByDateRange(fromDate, toDate)
                     .getData();
-            if (appointments == null)
+            if (appointments == null) {
                 appointments = Collections.emptyList();
+            }
 
             // Collect all invoices for these appointments
             List<InvoiceDTO> allInvoices = new ArrayList<>();
@@ -268,8 +273,8 @@ public class ReportService {
                             // Filter invoices within date range
                             List<InvoiceDTO> filtered = pinInvoices.stream()
                                     .filter(inv -> inv.getInvoiceDate() != null
-                                            && inv.getInvoiceDate().toString().compareTo(fromDate) >= 0
-                                            && inv.getInvoiceDate().toString().compareTo(toDate) <= 0)
+                                    && inv.getInvoiceDate().toString().compareTo(fromDate) >= 0
+                                    && inv.getInvoiceDate().toString().compareTo(toDate) <= 0)
                                     .collect(Collectors.toList());
                             allInvoices.addAll(filtered);
                         }
@@ -302,8 +307,9 @@ public class ReportService {
                 appointments = appointmentClient.getAppointmentsByDateRange(fromDate, toDate).getData();
             }
 
-            if (appointments == null)
+            if (appointments == null) {
                 appointments = Collections.emptyList();
+            }
 
             if (status != null && !status.isEmpty()) {
                 String s = status.toUpperCase();
@@ -342,8 +348,9 @@ public class ReportService {
         try {
             List<AppointmentSummaryDTO> appointments = appointmentClient.getAppointmentsByDateRange(fromDate, toDate)
                     .getData();
-            if (appointments == null)
+            if (appointments == null) {
                 appointments = Collections.emptyList();
+            }
 
             Map<String, List<AppointmentSummaryDTO>> byStatus = appointments.stream()
                     .collect(Collectors.groupingBy(
@@ -373,8 +380,9 @@ public class ReportService {
     public ReportResponse<Map<String, Object>> getDoctorAvailabilityReport(String date) {
         try {
             List<DoctorDTO> doctors = doctorClient.getAllActiveDoctors().getData();
-            if (doctors == null)
+            if (doctors == null) {
                 doctors = Collections.emptyList();
+            }
 
             List<Map<String, Object>> availabilityList = new ArrayList<>();
             for (DoctorDTO doctor : doctors) {
@@ -445,8 +453,9 @@ public class ReportService {
             // Doctor + date CVRs
             if (doctorId != null && !doctorId.isEmpty() && fromDate != null) {
                 List<CvrSummaryDTO> cvrList = cvrClient.getCVRsByDoctorAndDate(doctorId, fromDate).getData();
-                if (cvrList == null)
+                if (cvrList == null) {
                     cvrList = Collections.emptyList();
+                }
 
                 Map<String, Long> statusWise = cvrList.stream()
                         .collect(Collectors.groupingBy(c -> c.getStatus() != null ? c.getStatus() : "UNKNOWN",
@@ -472,14 +481,18 @@ public class ReportService {
                     for (java.time.LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
                         try {
                             List<CvrSummaryDTO> dayList = cvrClient.getCVRsByDate(d.toString()).getData();
-                            if (dayList != null) cvrList.addAll(dayList);
+                            if (dayList != null) {
+                                cvrList.addAll(dayList);
+                            }
                         } catch (Exception ex) {
                             log.warn("Could not fetch CVRs for date: {}", d);
                         }
                     }
                 } else {
                     List<CvrSummaryDTO> dayList = cvrClient.getCVRsByDate(fromDate).getData();
-                    if (dayList != null) cvrList = dayList;
+                    if (dayList != null) {
+                        cvrList = dayList;
+                    }
                 }
 
                 Map<String, Long> statusWise = cvrList.stream()
@@ -501,8 +514,9 @@ public class ReportService {
 
             // Default: today
             List<CvrSummaryDTO> todayCvrs = cvrClient.getTodaysCVRs().getData();
-            if (todayCvrs == null)
+            if (todayCvrs == null) {
                 todayCvrs = Collections.emptyList();
+            }
             result.put("date", "TODAY");
             result.put("totalCVRs", todayCvrs.size());
             result.put("cvrList", todayCvrs);
@@ -533,8 +547,9 @@ public class ReportService {
             // Patient prescriptions
             if (pinNumber != null && !pinNumber.isEmpty()) {
                 List<PrescriptionDTO> prescriptions = opdClient.getPatientPrescriptions(pinNumber).getData();
-                if (prescriptions == null)
+                if (prescriptions == null) {
                     prescriptions = Collections.emptyList();
+                }
 
                 result.put("pinNumber", pinNumber);
                 result.put("totalPrescriptions", prescriptions.size());
@@ -549,15 +564,17 @@ public class ReportService {
             if (doctorId != null && !doctorId.isEmpty() && date != null) {
                 List<ConsultationDTO> consultations = opdClient.getConsultationsByDoctorAndDate(doctorId, date)
                         .getData();
-                if (consultations == null)
+                if (consultations == null) {
                     consultations = Collections.emptyList();
+                }
 
                 List<PrescriptionDTO> prescriptions = new ArrayList<>();
                 for (ConsultationDTO c : consultations) {
                     try {
                         PrescriptionDTO rx = opdClient.getPrescriptionByConsultation(c.getConsultationId()).getData();
-                        if (rx != null)
+                        if (rx != null) {
                             prescriptions.add(rx);
+                        }
                     } catch (Exception ex) {
                         // No prescription for this consultation
                     }
@@ -572,6 +589,26 @@ public class ReportService {
                 return ReportResponse.success("Prescription Report", result);
             }
 
+            // âœ… CORRECT LOGIC
+            if (date != null && (doctorId == null || doctorId.isEmpty())) {
+
+                List<PrescriptionDTO> prescriptions
+                        = opdClient.getPrescriptionsByDate(date).getData();
+
+                if (prescriptions == null) {
+                    prescriptions = Collections.emptyList();
+                }
+
+                // ðŸ”¥ DEBUG (optional but useful)
+                log.info("TOTAL PRESCRIPTIONS FROM OPD: {}", prescriptions.size());
+
+                result.put("date", date);
+                result.put("totalPrescriptions", prescriptions.size());
+                result.put("prescriptions", prescriptions);
+                result.put("type", "DATE_PRESCRIPTIONS");
+                System.out.println("ðŸ‘‰ FROM OPD SIZE = " + prescriptions.size());
+                return ReportResponse.success("Prescription Report", result);
+            }
             return ReportResponse.success("Prescription Report", result);
         } catch (Exception e) {
             log.error("Error generating prescription report", e);
@@ -582,67 +619,173 @@ public class ReportService {
     // =====================================================================
     // 12. INVOICE SUMMARY REPORT
     // =====================================================================
+//    public ReportResponse<Map<String, Object>> getInvoiceSummaryReport(
+//            String pinNumber, String invoiceNumber, String fromDate, String toDate) {
+//        try {
+//            Map<String, Object> result = new LinkedHashMap<>();
+//
+//            // Single invoice
+//            if (invoiceNumber != null && !invoiceNumber.isEmpty()) {
+//                InvoiceDTO invoice = billingClient.getInvoice(invoiceNumber).getData();
+//                if (invoice != null) {
+//                    List<PaymentDTO> payments = billingClient.getInvoicePayments(invoiceNumber).getData();
+//                    result.put("invoice", invoice);
+//                    result.put("payments", payments);
+//                }
+//                result.put("type", "SINGLE_INVOICE");
+//                return ReportResponse.success("Invoice Summary Report", result);
+//            }
+//
+//            // Patient invoices
+//            if (pinNumber != null && !pinNumber.isEmpty()) {
+//                List<InvoiceDTO> invoices = billingClient.getPatientInvoices(pinNumber).getData();
+//                if (invoices == null) {
+//                    invoices = Collections.emptyList();
+//                }
+//
+//                BigDecimal totalAmount = invoices.stream()
+//                        .map(InvoiceDTO::getTotalAmount)
+//                        .filter(Objects::nonNull)
+//                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+//                BigDecimal paidAmount = invoices.stream()
+//                        .map(InvoiceDTO::getPaidAmount)
+//                        .filter(Objects::nonNull)
+//                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+//                BigDecimal outstanding = invoices.stream()
+//                        .map(InvoiceDTO::getOutstandingAmount)
+//                        .filter(Objects::nonNull)
+//                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+//
+//                result.put("pinNumber", pinNumber);
+//                result.put("totalInvoices", invoices.size());
+//                result.put("totalAmount", totalAmount);
+//                result.put("paidAmount", paidAmount);
+//                result.put("outstandingAmount", outstanding);
+//                result.put("invoices", invoices);
+//                result.put("type", "PATIENT_INVOICES");
+//                return ReportResponse.success("Invoice Summary Report", result);
+//            }
+//
+//            return ReportResponse.success("Invoice Summary Report", result);
+//        } catch (Exception e) {
+//            log.error("Error generating invoice summary report", e);
+//            throw new RuntimeException("Failed to generate Invoice Summary Report: " + e.getMessage());
+//        }
+//    }
     public ReportResponse<Map<String, Object>> getInvoiceSummaryReport(
-            String pinNumber, String invoiceNumber, String fromDate, String toDate) {
-        try {
-            Map<String, Object> result = new LinkedHashMap<>();
+        String pinNumber, String invoiceNumber, String fromDate, String toDate) {
+    try {
+        Map<String, Object> result = new LinkedHashMap<>();
 
-            // Single invoice
-            if (invoiceNumber != null && !invoiceNumber.isEmpty()) {
-                InvoiceDTO invoice = billingClient.getInvoice(invoiceNumber).getData();
-                if (invoice != null) {
-                    List<PaymentDTO> payments = billingClient.getInvoicePayments(invoiceNumber).getData();
-                    result.put("invoice", invoice);
-                    result.put("payments", payments);
-                }
-                result.put("type", "SINGLE_INVOICE");
-                return ReportResponse.success("Invoice Summary Report", result);
+        // Single invoice
+        if (invoiceNumber != null && !invoiceNumber.isEmpty()) {
+            InvoiceDTO invoice = billingClient.getInvoice(invoiceNumber).getData();
+            if (invoice != null) {
+                List<PaymentDTO> payments = billingClient.getInvoicePayments(invoiceNumber).getData();
+                result.put("invoice", invoice);
+                result.put("payments", payments);
             }
-
-            // Patient invoices
-            if (pinNumber != null && !pinNumber.isEmpty()) {
-                List<InvoiceDTO> invoices = billingClient.getPatientInvoices(pinNumber).getData();
-                if (invoices == null)
-                    invoices = Collections.emptyList();
-
-                BigDecimal totalAmount = invoices.stream()
-                        .map(InvoiceDTO::getTotalAmount)
-                        .filter(Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal paidAmount = invoices.stream()
-                        .map(InvoiceDTO::getPaidAmount)
-                        .filter(Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal outstanding = invoices.stream()
-                        .map(InvoiceDTO::getOutstandingAmount)
-                        .filter(Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                result.put("pinNumber", pinNumber);
-                result.put("totalInvoices", invoices.size());
-                result.put("totalAmount", totalAmount);
-                result.put("paidAmount", paidAmount);
-                result.put("outstandingAmount", outstanding);
-                result.put("invoices", invoices);
-                result.put("type", "PATIENT_INVOICES");
-                return ReportResponse.success("Invoice Summary Report", result);
-            }
-
+            result.put("type", "SINGLE_INVOICE");
             return ReportResponse.success("Invoice Summary Report", result);
-        } catch (Exception e) {
-            log.error("Error generating invoice summary report", e);
-            throw new RuntimeException("Failed to generate Invoice Summary Report: " + e.getMessage());
         }
-    }
 
+        // Patient invoices
+        if (pinNumber != null && !pinNumber.isEmpty()) {
+            List<InvoiceDTO> invoices = billingClient.getPatientInvoices(pinNumber).getData();
+            if (invoices == null) {
+                invoices = Collections.emptyList();
+            }
+
+            BigDecimal totalAmount = invoices.stream()
+                    .map(InvoiceDTO::getTotalAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paidAmount = invoices.stream()
+                    .map(InvoiceDTO::getPaidAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal outstanding = invoices.stream()
+                    .map(InvoiceDTO::getOutstandingAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            result.put("pinNumber", pinNumber);
+            result.put("totalInvoices", invoices.size());
+            result.put("totalAmount", totalAmount);
+            result.put("paidAmount", paidAmount);
+            result.put("outstandingAmount", outstanding);
+            result.put("invoices", invoices);
+            result.put("type", "PATIENT_INVOICES");
+            return ReportResponse.success("Invoice Summary Report", result);
+        }
+
+        // âœ… DATE RANGE SEARCH - ADD THIS
+        if (fromDate != null && toDate != null) {
+            List<InvoiceDTO> allInvoices = new ArrayList<>();
+            
+            // Get all patients
+            List<PatientDTO> patients = patientClient.getAllActivePatients().getData();
+            if (patients != null) {
+                for (PatientDTO patient : patients) {
+                    try {
+                        List<InvoiceDTO> patientInvoices = billingClient
+                                .getPatientInvoices(patient.getPinNumber())
+                                .getData();
+                        if (patientInvoices != null) {
+                            for (InvoiceDTO inv : patientInvoices) {
+                                if (inv.getInvoiceDate() != null) {
+                                    String invDate = inv.getInvoiceDate().toString();
+                                    if (invDate.compareTo(fromDate) >= 0 && invDate.compareTo(toDate) <= 0) {
+                                        allInvoices.add(inv);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        // Skip
+                    }
+                }
+            }
+
+            BigDecimal totalAmount = allInvoices.stream()
+                    .map(InvoiceDTO::getTotalAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paidAmount = allInvoices.stream()
+                    .map(InvoiceDTO::getPaidAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal outstandingAmount = allInvoices.stream()
+                    .map(InvoiceDTO::getOutstandingAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            result.put("fromDate", fromDate);
+            result.put("toDate", toDate);
+            result.put("totalInvoices", allInvoices.size());
+            result.put("totalAmount", totalAmount);
+            result.put("paidAmount", paidAmount);
+            result.put("outstandingAmount", outstandingAmount);
+            result.put("invoices", allInvoices);
+            result.put("type", "DATE_RANGE_INVOICES");
+            
+            return ReportResponse.success("Invoice Summary Report", result);
+        }
+
+        return ReportResponse.success("Invoice Summary Report", result);
+    } catch (Exception e) {
+        log.error("Error generating invoice summary report", e);
+        throw new RuntimeException("Failed to generate Invoice Summary Report: " + e.getMessage());
+    }
+}
     // =====================================================================
     // 13. PAYMENT COLLECTION REPORT
     // =====================================================================
     public ReportResponse<Map<String, Object>> getPaymentCollectionReport(
             String fromDate, String toDate, String doctorId) {
         try {
-            // ─── DIRECT APPROACH: query payments by date range from BillingService ───
-            // This avoids the broken appointments→invoices chain and is much more reliable.
+            // â”€â”€â”€ DIRECT APPROACH: query payments by date range from BillingService â”€â”€â”€
+            // This avoids the broken appointmentsâ†’invoices chain and is much more reliable.
             List<PaymentDTO> allPayments;
             try {
                 ApiResponse<List<PaymentDTO>> paymentResponse = billingClient.getPaymentsByDateRange(fromDate, toDate,
@@ -683,8 +826,8 @@ public class ReportService {
     }
 
     /**
-     * Fallback: scan invoices via patient PINs obtained from appointments.
-     * Used only if the direct payment-collection endpoint is unavailable.
+     * Fallback: scan invoices via patient PINs obtained from appointments. Used
+     * only if the direct payment-collection endpoint is unavailable.
      */
     private List<PaymentDTO> fallbackPaymentCollection(String fromDate, String toDate, String doctorId) {
         try {
@@ -705,8 +848,9 @@ public class ReportService {
                         try {
                             List<InvoiceDTO> pinInvoices = billingClient.getPatientInvoices(appt.getPinNumber())
                                     .getData();
-                            if (pinInvoices != null)
+                            if (pinInvoices != null) {
                                 invoices.addAll(pinInvoices);
+                            }
                         } catch (Exception ex) {
                             log.warn("Fallback: cannot fetch invoices for PIN: {}", appt.getPinNumber());
                         }
@@ -714,8 +858,9 @@ public class ReportService {
                     }
                 }
             }
-            if (invoices == null)
+            if (invoices == null) {
                 invoices = Collections.emptyList();
+            }
 
             List<PaymentDTO> payments = new ArrayList<>();
             for (InvoiceDTO invoice : invoices) {
@@ -723,8 +868,9 @@ public class ReportService {
                     try {
                         List<PaymentDTO> invPayments = billingClient.getInvoicePayments(invoice.getInvoiceNumber())
                                 .getData();
-                        if (invPayments != null)
+                        if (invPayments != null) {
                             payments.addAll(invPayments);
+                        }
                     } catch (Exception ex) {
                         log.warn("Fallback: cannot fetch payments for invoice: {}", invoice.getInvoiceNumber());
                     }
@@ -743,8 +889,9 @@ public class ReportService {
     public ReportResponse<Map<String, Object>> getOutstandingDuesReport() {
         try {
             List<InvoiceDTO> pendingInvoices = billingClient.getPendingInvoices().getData();
-            if (pendingInvoices == null)
+            if (pendingInvoices == null) {
                 pendingInvoices = Collections.emptyList();
+            }
 
             BigDecimal totalOutstanding = pendingInvoices.stream()
                     .map(InvoiceDTO::getOutstandingAmount)
@@ -787,9 +934,9 @@ public class ReportService {
                                     .getData();
                             if (pinInvoices != null) {
                                 List<InvoiceDTO> filtered = pinInvoices.stream()
-                                        .filter(inv -> inv.getInvoiceDate() != null &&
-                                                inv.getInvoiceDate().toString().compareTo(fromDate) >= 0 &&
-                                                inv.getInvoiceDate().toString().compareTo(toDate) <= 0)
+                                        .filter(inv -> inv.getInvoiceDate() != null
+                                        && inv.getInvoiceDate().toString().compareTo(fromDate) >= 0
+                                        && inv.getInvoiceDate().toString().compareTo(toDate) <= 0)
                                         .collect(Collectors.toList());
                                 allInvoices.addAll(filtered);
                             }
@@ -818,18 +965,21 @@ public class ReportService {
 
             List<ConsultationDTO> consultations = opdClient.getConsultationsByDoctorAndDate(doctorId, fromDate)
                     .getData();
-            if (consultations == null)
+            if (consultations == null) {
                 consultations = Collections.emptyList();
+            }
 
             List<AppointmentSummaryDTO> appointments = appointmentClient.getDoctorAppointments(doctorId, fromDate)
                     .getData();
-            if (appointments == null)
+            if (appointments == null) {
                 appointments = Collections.emptyList();
+            }
 
             // Revenue for this doctor
             List<InvoiceDTO> invoices = billingClient.getInvoicesByDoctorAndDate(doctorId, fromDate).getData();
-            if (invoices == null)
+            if (invoices == null) {
                 invoices = Collections.emptyList();
+            }
 
             BigDecimal revenue = invoices.stream()
                     .map(InvoiceDTO::getPaidAmount)
@@ -893,8 +1043,9 @@ public class ReportService {
                     schedules = doctorClient.getUpcomingSchedules(doctorId, 30).getData();
                 }
 
-                if (schedules == null)
+                if (schedules == null) {
                     schedules = Collections.emptyList();
+                }
 
                 result.put("doctorId", doctorId);
                 result.put("doctorName", doctor != null ? doctor.getFullName() : doctorId);
@@ -907,8 +1058,9 @@ public class ReportService {
             } else {
                 // All doctors schedule
                 List<DoctorDTO> doctors = doctorClient.getAllActiveDoctors().getData();
-                if (doctors == null)
+                if (doctors == null) {
                     doctors = Collections.emptyList();
+                }
 
                 List<Map<String, Object>> allSchedules = new ArrayList<>();
                 for (DoctorDTO doctor : doctors) {
@@ -946,8 +1098,9 @@ public class ReportService {
     public ReportResponse<Map<String, Object>> getPatientSearchReport(String query, String searchType) {
         try {
             List<PatientDTO> patients = patientClient.searchPatients(query, searchType).getData();
-            if (patients == null)
+            if (patients == null) {
                 patients = Collections.emptyList();
+            }
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("query", query);

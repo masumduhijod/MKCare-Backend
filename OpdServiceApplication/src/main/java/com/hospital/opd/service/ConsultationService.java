@@ -10,6 +10,10 @@ import com.hospital.opd.dto.CreateConsultationDTO;
 import com.hospital.opd.entity.Consultation;
 import com.hospital.opd.entity.Consultation.ConsultationStatus;
 import com.hospital.opd.repository.ConsultationRepository;
+import com.hospital.opd.repository.OpdQueueRepository;
+import com.hospital.opd.repository.PrescriptionRepository;
+import com.hospital.opd.entity.OpdQueue;
+import org.springframework.transaction.annotation.Transactional;
 import static java.lang.StrictMath.log;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConsultationService {
 
     private final ConsultationRepository consultationRepository;
+    private final OpdQueueRepository opdQueueRepository;
+    private final PrescriptionRepository prescriptionRepository;
     private final ModelMapper modelMapper;
     @Autowired
 private JdbcTemplate jdbcTemplate;
@@ -77,10 +83,53 @@ private JdbcTemplate jdbcTemplate;
         return modelMapper.map(consultation, ConsultationDTO.class);
     }
 
+    public ConsultationDTO getConsultationByCvrNumber(String cvrNumber) {
+        Consultation consultation = consultationRepository.findByCvrNumber(cvrNumber)
+                .orElseThrow(() -> new RuntimeException("Consultation not found for CVR: " + cvrNumber));
+        return modelMapper.map(consultation, ConsultationDTO.class);
+    }
+
     public ConsultationDTO completeConsultation(String consultationId) {
         Consultation consultation = consultationRepository.findByConsultationId(consultationId)
                 .orElseThrow(() -> new RuntimeException("Consultation not found"));
+        
+        log.info("🎯 Finalizing Consultation: {} | Appointment: {} | CVR: {}", 
+            consultationId, consultation.getAppointmentId(), consultation.getCvrNumber());
+            
         consultation.complete();
+        
+        // ✅ 1. Update Linked Queue entry (Same service)
+        if (consultation.getAppointmentId() != null) {
+            opdQueueRepository.findByAppointmentId(consultation.getAppointmentId())
+                .ifPresent(queue -> {
+                    queue.completeConsultation();
+                    opdQueueRepository.save(queue);
+                    log.info("✅ Queue entry marked as COMPLETED for Appointment: {}", consultation.getAppointmentId());
+                });
+        }
+        
+        // ✅ 2. Update Linked Appointment (Cross-service but same DB)
+        if (consultation.getAppointmentId() != null) {
+            try {
+                String sql = "UPDATE appointments SET status = 'COMPLETED', consultation_ended_at = NOW() WHERE appointment_id = ?";
+                int updated = jdbcTemplate.update(sql, consultation.getAppointmentId());
+                log.info("✅ Appointment table updated via JDBC. Rows affected: {}", updated);
+            } catch (Exception e) {
+                log.error("⚠️ Failed to update Appointment table via JDBC: {}", e.getMessage());
+            }
+        }
+
+        // ✅ 3. Update Linked CVR (Cross-service but same DB)
+        if (consultation.getCvrNumber() != null) {
+            try {
+                String sql = "UPDATE case_visit_records SET status = 'COMPLETED', consultation_completed_at = NOW() WHERE cvr_number = ?";
+                int updated = jdbcTemplate.update(sql, consultation.getCvrNumber());
+                log.info("✅ CVR table updated via JDBC. Rows affected: {}", updated);
+            } catch (Exception e) {
+                log.error("⚠️ Failed to update CVR table via JDBC: {}", e.getMessage());
+            }
+        }
+        
         return modelMapper.map(consultationRepository.save(consultation), ConsultationDTO.class);
     }
 
@@ -175,4 +224,20 @@ public List<ConsultationDTO> getConsultationsByDoctorAndDate(String doctorId, Lo
             .collect(Collectors.toList());
 }
 
+    public List<String> getClinicallyFinalizedCvrs(String doctorId, LocalDate date) {
+        log.info("🔍 Checking clinical finalization for Doctor: {} on Date: {}", doctorId, date);
+        
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.atTime(23, 59, 59);
+        
+        // 1. Get all consultations for this doctor/date
+        List<Consultation> consultations = consultationRepository.findByDoctorIdAndConsultationDateBetween(doctorId, start, end);
+        
+        // 2. Filter those that have a linked prescription
+        return consultations.stream()
+            .filter(c -> prescriptionRepository.findByConsultationId(c.getConsultationId()).isPresent())
+            .map(Consultation::getCvrNumber)
+            .distinct()
+            .collect(Collectors.toList());
+    }
 }

@@ -30,6 +30,7 @@ public class CreatePrescriptionDTO {
     private String doctorId;
     private Integer validityDays;
     private String instructions;
+    private String createdBy;
 //    @NotEmpty(message = "At least one medicine is required")
     private List<PrescriptionItemDTO> items;
 }

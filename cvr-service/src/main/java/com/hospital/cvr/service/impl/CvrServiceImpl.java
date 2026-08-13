@@ -10,6 +10,7 @@ package com.hospital.cvr.service.impl;
  * @author mduhijod
  */
 import com.hospital.cvr.client.PatientServiceClient;
+import com.hospital.cvr.client.DoctorServiceClient;
 import com.hospital.cvr.dto.*;
 import com.hospital.cvr.entity.CaseVisitRecord;
 import com.hospital.cvr.entity.CvrVitals;
@@ -42,6 +43,7 @@ public class CvrServiceImpl implements CvrService {
     private final CvrRepository cvrRepository;
     private final CvrVitalsRepository cvrVitalsRepository;
     private final PatientServiceClient patientServiceClient;
+    private final DoctorServiceClient doctorServiceClient;
     private final CvrNumberGenerator cvrNumberGenerator;
     private final ModelMapper modelMapper;
 
@@ -72,19 +74,43 @@ public class CvrServiceImpl implements CvrService {
         cvr.setAppointmentId(createCvrDTO.getAppointmentId());
         cvr.setAppointmentDate(createCvrDTO.getAppointmentDate());
         cvr.setAppointmentTime(createCvrDTO.getAppointmentTime());
+        
+        // *** STORE CLINICAL DETAILS ***
+        cvr.setChiefComplaint(createCvrDTO.getChiefComplaint() != null ? createCvrDTO.getChiefComplaint() : "Consultation");
+        cvr.setSymptoms(createCvrDTO.getSymptoms());
+        cvr.setDepartment(createCvrDTO.getDepartment());
+        cvr.setDoctorId(createCvrDTO.getDoctorId());
 
         // *** DO NOT SET VISIT DATE/TIME - Keep NULL ***
         cvr.setVisitDate(null);
         cvr.setVisitTime(null);
 
-        cvr.setVisitType(CaseVisitRecord.VisitType.valueOf(
-                createCvrDTO.getVisitType().toUpperCase()
-        ));
-        cvr.setChiefComplaint(createCvrDTO.getChiefComplaint());
-        cvr.setSymptoms(createCvrDTO.getSymptoms());
-        cvr.setDepartment(createCvrDTO.getDepartment());
-        cvr.setDoctorId(createCvrDTO.getDoctorId());
         cvr.setCreatedBy(createCvrDTO.getCreatedBy());
+
+        // ============================================
+        // ⭐ OP CASE & FOLLOW-UP LOGIC (Manual Selection)
+        // ============================================
+        String opCaseNumber = createCvrDTO.getOpCaseNumber();
+        
+        if (opCaseNumber != null && !opCaseNumber.isEmpty()) {
+            // 🎯 CASE A: Reception selected an existing case from LOV
+            log.info("🎯 Existing OP Case selected: {}. Marking as FOLLOW_UP", opCaseNumber);
+            cvr.setOpCaseNumber(opCaseNumber);
+            cvr.setVisitType(CaseVisitRecord.VisitType.FOLLOW_UP);
+        } else {
+            // 🆕 CASE B: No case selected -> Create new unique OP Case for this visit
+            List<String> lastOpCases = cvrRepository.findTopByOrderByOpCaseNumberDesc();
+            String lastOpCase = lastOpCases.isEmpty() ? null : lastOpCases.get(0);
+            opCaseNumber = cvrNumberGenerator.generateOpCase(lastOpCase, LocalDate.now());
+            
+            log.info("🆕 Generating new unique OP Case: {} for this visit", opCaseNumber);
+            cvr.setOpCaseNumber(opCaseNumber);
+            
+            // Set visit type from DTO (Normal/Emergency/etc.)
+            cvr.setVisitType(CaseVisitRecord.VisitType.valueOf(
+                createCvrDTO.getVisitType().toUpperCase()
+            ));
+        }
 
         // Set status based on whether appointment exists
         if (createCvrDTO.getAppointmentId() != null) {
@@ -467,12 +493,15 @@ public class CvrServiceImpl implements CvrService {
         dto.setPinNumber(cvr.getPinNumber());
         dto.setAppointmentDate(cvr.getAppointmentDate());
         dto.setAppointmentTime(cvr.getAppointmentTime());
-        dto.setVisitDate(cvr.getVisitDate());
+        // Use actual visitDate if patient arrived, otherwise fall back to appointmentDate for display
+        dto.setVisitDate(cvr.getVisitDate() != null ? cvr.getVisitDate() : cvr.getAppointmentDate());
         dto.setVisitTime(cvr.getVisitTime());
         dto.setVisitType(cvr.getVisitType().name());
         dto.setChiefComplaint(cvr.getChiefComplaint());
         dto.setStatus(cvr.getStatus().name());
         dto.setHasVisited(cvr.hasVisited());
+        dto.setDepartment(cvr.getDepartment());
+        dto.setDoctorId(cvr.getDoctorId());
 
         // Calculate arrival status
         if (cvr.getVisitDate() == null) {
@@ -553,5 +582,60 @@ public class CvrServiceImpl implements CvrService {
         cvrVitalsRepository.deleteAll(vitals);
 
         return "Vitals deleted successfully for CVR: " + cvrNumber;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OpCaseDTO> getActiveOpCases(String pinNumber, String doctorId) {
+        log.info("🔍 Fetching active OP cases for PIN: {} and Doctor: {}", pinNumber, doctorId);
+
+        // 1. Fetch Doctor's Follow-up Limit
+        int followUpDays = 7; // Default
+        try {
+            ApiResponse<DoctorDTO> doctorResp = doctorServiceClient.getDoctorById(doctorId);
+            if (doctorResp.isSuccess() && doctorResp.getData() != null) {
+                if (doctorResp.getData().getFollowUpDaysLimit() != null) {
+                    followUpDays = doctorResp.getData().getFollowUpDaysLimit();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Could not fetch doctor details, using default 7 days limit");
+        }
+
+        // 2. Fetch CVRs within that limit
+        LocalDate sinceDate = LocalDate.now().minusDays(followUpDays);
+        log.info("📅 Searching for cases since: {} (Limit: {} days)", sinceDate, followUpDays);
+        
+        List<CaseVisitRecord> cvrs = cvrRepository.findByPinNumberOrderByVisitDateDesc(pinNumber);
+        
+        return cvrs.stream()
+                .filter(c -> c.getOpCaseNumber() != null)
+                .filter(c -> c.getDoctorId() != null && c.getDoctorId().equals(doctorId))
+                .filter(c -> {
+                    LocalDate date = c.getVisitDate() != null ? c.getVisitDate() : c.getAppointmentDate();
+                    return date != null && !date.isBefore(sinceDate);
+                })
+                .map(c -> {
+                    OpCaseDTO dto = new OpCaseDTO();
+                    dto.setOpCaseNumber(c.getOpCaseNumber());
+                    dto.setCvrNumber(c.getCvrNumber());
+                    dto.setLastVisitDate(c.getVisitDate() != null ? c.getVisitDate() : c.getAppointmentDate());
+                    dto.setVisitTime(c.getCheckedInAt() != null ? c.getCheckedInAt().toLocalTime() : (c.getAppointmentTime() != null ? c.getAppointmentTime() : null));
+                    dto.setDoctorId(c.getDoctorId());
+                    dto.setVisitType(c.getVisitType().name());
+                    dto.setChiefComplaint(c.getChiefComplaint());
+                    if (dto.getLastVisitDate() != null) {
+                        dto.setDaysAgo((int) java.time.temporal.ChronoUnit.DAYS.between(dto.getLastVisitDate(), LocalDate.now()));
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toMap(
+                    OpCaseDTO::getOpCaseNumber,
+                    dto -> dto,
+                    (existing, replacement) -> existing
+                ))
+                .values().stream()
+                .sorted((a, b) -> b.getLastVisitDate().compareTo(a.getLastVisitDate()))
+                .collect(Collectors.toList());
     }
 }

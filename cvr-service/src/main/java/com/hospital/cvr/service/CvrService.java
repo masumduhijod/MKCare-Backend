@@ -162,4 +162,9 @@ CvrDTO getCVRByAppointmentId(String appointmentId);
 
 String deleteVitalsByCVR(String cvrNumber);
 
+    /**
+     * Get active OP cases for follow-up selection
+     */
+    List<OpCaseDTO> getActiveOpCases(String pinNumber, String doctorId);
+
 }

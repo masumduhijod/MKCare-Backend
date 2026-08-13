@@ -49,6 +49,7 @@ public class BookAppointmentDTO {
     
     private String symptoms;
     private String notes;
+    private String opCaseNumber;
     
 //    @NotBlank(message = "Created by is required")
     private String createdBy;

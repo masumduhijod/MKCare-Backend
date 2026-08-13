@@ -15,8 +15,10 @@ import com.hospital.opd.dto.PrescriptionDTO;
 import com.hospital.opd.dto.PrescriptionItemDTO;
 import com.hospital.opd.entity.Prescription;
 import com.hospital.opd.entity.PrescriptionItem;
+import com.hospital.opd.entity.Consultation;
 import com.hospital.opd.repository.PrescriptionItemRepository;
 import com.hospital.opd.repository.PrescriptionRepository;
+import com.hospital.opd.repository.ConsultationRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class PrescriptionService {
 
     private final PrescriptionRepository prescriptionRepository;
     private final PrescriptionItemRepository itemRepository;
+    private final ConsultationRepository consultationRepository;
     private final ModelMapper modelMapper;
 
     public PrescriptionDTO createPrescription(CreatePrescriptionDTO dto) {
@@ -46,13 +49,37 @@ public class PrescriptionService {
         prescription.setConsultationNumber(dto.getConsultationNumber());
         prescription.setPinNumber(dto.getPinNumber());
         prescription.setDoctorId(dto.getDoctorId());
-        prescription.setPatientId(1L); // TODO
+        
+        Long patientId = consultationRepository.findByConsultationId(dto.getConsultationId())
+                .map(com.hospital.opd.entity.Consultation::getPatientId)
+                .orElse(1L);
+        prescription.setPatientId(patientId);
+        
         prescription.setValidityDays(dto.getValidityDays() != null ? dto.getValidityDays() : 30);
         prescription.setInstructions(dto.getInstructions());
+        prescription.setCreatedBy(dto.getCreatedBy());
+
+        // Fetch Consultation to get CVR details
+        Consultation consultation = consultationRepository.findByConsultationId(dto.getConsultationId())
+                .orElse(null);
 
         // Add items
         for (PrescriptionItemDTO itemDTO : dto.getItems()) {
             PrescriptionItem item = modelMapper.map(itemDTO, PrescriptionItem.class);
+            
+            // Populate denormalized fields
+            item.setPrescriptionId(prescriptionId);
+            item.setPinNumber(dto.getPinNumber());
+            item.setCreatedBy(dto.getCreatedBy());
+            
+            if (consultation != null) {
+                item.setCvrNumber(consultation.getCvrNumber());
+                if (consultation.getConsultationDate() != null) {
+                    item.setCvrDate(consultation.getConsultationDate().toLocalDate());
+                    item.setCvrTime(consultation.getConsultationDate().toLocalTime());
+                }
+            }
+            
             prescription.addItem(item);
         }
 
@@ -81,7 +108,7 @@ public class PrescriptionService {
         return dto;
     }
 
-    private String generatePrescriptionId() {
+    private synchronized String generatePrescriptionId() {
         List<String> ids = prescriptionRepository.findTopByOrderByIdDesc();
         String lastId = ids.isEmpty() ? null : ids.get(0);
         int nextNum = 1;
@@ -136,9 +163,28 @@ public class PrescriptionService {
         itemRepository.deleteAll(prescription.getItems());
         prescription.getItems().clear();
 
+        // Fetch Consultation to get CVR details for denormalization
+        Consultation consultation = consultationRepository.findByConsultationId(prescription.getConsultationId())
+                .orElse(null);
+
         // ✅ ADD NEW ITEMS
         for (PrescriptionItemDTO itemDTO : dto.getItems()) {
             PrescriptionItem item = modelMapper.map(itemDTO, PrescriptionItem.class);
+            
+            // Populate denormalized fields
+            item.setPrescriptionId(prescriptionId);
+            item.setPinNumber(prescription.getPinNumber());
+            item.setModifyBy(dto.getCreatedBy());
+            item.setCreatedBy(prescription.getCreatedBy()); // Preserve original creator if possible
+            
+            if (consultation != null) {
+                item.setCvrNumber(consultation.getCvrNumber());
+                if (consultation.getConsultationDate() != null) {
+                    item.setCvrDate(consultation.getConsultationDate().toLocalDate());
+                    item.setCvrTime(consultation.getConsultationDate().toLocalTime());
+                }
+            }
+            
             prescription.addItem(item);
         }
 

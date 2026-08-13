@@ -40,9 +40,10 @@ public interface CvrRepository extends JpaRepository<CaseVisitRecord, Long> {
     List<String> findTopByOrderByCvrIdDesc();
 
     /**
-     * Get all CVRs for a patient by PIN
+     * Get all CVRs for a patient by PIN (includes appointments not yet visited)
      */
-    List<CaseVisitRecord> findByPinNumberOrderByVisitDateDesc(String pinNumber);
+    @Query("SELECT c FROM CaseVisitRecord c WHERE c.pinNumber = :pinNumber ORDER BY COALESCE(c.visitDate, c.appointmentDate) DESC")
+    List<CaseVisitRecord> findByPinNumberOrderByVisitDateDesc(@Param("pinNumber") String pinNumber);
 
     /**
      * Get CVRs by patient ID
@@ -52,13 +53,15 @@ public interface CvrRepository extends JpaRepository<CaseVisitRecord, Long> {
     /**
      * Get CVRs by date
      */
-    List<CaseVisitRecord> findByVisitDateOrderByVisitTimeAsc(LocalDate visitDate);
+    @Query("SELECT c FROM CaseVisitRecord c WHERE c.visitDate = :visitDate OR c.appointmentDate = :visitDate")
+    List<CaseVisitRecord> findByVisitDateOrderByVisitTimeAsc(@Param("visitDate") LocalDate visitDate);
 
     /**
      * Get CVRs by date and doctor
      */
+    @Query("SELECT c FROM CaseVisitRecord c WHERE (c.visitDate = :visitDate OR c.appointmentDate = :visitDate) AND c.doctorId = :doctorId")
     List<CaseVisitRecord> findByVisitDateAndDoctorIdOrderByVisitTimeAsc(
-        LocalDate visitDate, String doctorId
+        @Param("visitDate") LocalDate visitDate, @Param("doctorId") String doctorId
     );
 
     /**
@@ -118,6 +121,17 @@ public interface CvrRepository extends JpaRepository<CaseVisitRecord, Long> {
     /**
  * Get latest CVR by appointment ID
  */
-Optional<CaseVisitRecord> findTopByAppointmentIdOrderByCreatedAtDesc(String appointmentId);
+    Optional<CaseVisitRecord> findTopByAppointmentIdOrderByCreatedAtDesc(String appointmentId);
 
+    @Query("SELECT c.opCaseNumber FROM CaseVisitRecord c WHERE c.opCaseNumber IS NOT NULL ORDER BY c.cvrId DESC")
+    List<String> findTopByOrderByOpCaseNumberDesc();
+
+    @Query("SELECT c.opCaseNumber FROM CaseVisitRecord c WHERE c.pinNumber = :pinNumber AND c.doctorId = :doctorId " +
+           "AND (c.visitDate >= :sinceDate OR c.appointmentDate >= :sinceDate) " +
+           "AND c.opCaseNumber IS NOT NULL ORDER BY c.createdAt DESC")
+    List<String> findActiveOpCase(
+        @Param("pinNumber") String pinNumber, 
+        @Param("doctorId") String doctorId, 
+        @Param("sinceDate") LocalDate sinceDate
+    );
 }

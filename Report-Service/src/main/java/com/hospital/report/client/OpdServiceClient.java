@@ -32,4 +32,8 @@ public interface OpdServiceClient {
 
     @GetMapping("/prescriptions/consultation/{consultationId}")
     ApiResponse<PrescriptionDTO> getPrescriptionByConsultation(@PathVariable("consultationId") String consultationId);
+
+    @GetMapping("/prescriptions/by-date")
+    ApiResponse<List<PrescriptionDTO>> getPrescriptionsByDate(
+            @RequestParam("date") String date);
 }

@@ -44,6 +44,7 @@ public class DoctorDTO {
     
     private BigDecimal consultationFee;
     private BigDecimal followUpFee;
+    private Integer followUpDaysLimit;
     
     private String status;
     private Boolean availableForOPD;

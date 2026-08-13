@@ -403,4 +403,24 @@ public ResponseEntity<ApiResponse<String>> deleteVitals(
 
     return ResponseEntity.ok(response);
 }
+
+    /**
+     * Get active OP cases for follow-up selection
+     * GET /cvr/active-cases/{pinNumber}/{doctorId}
+     */
+    @GetMapping("/active-cases/{pinNumber}/{doctorId}")
+    public ResponseEntity<ApiResponse<List<OpCaseDTO>>> getActiveOpCases(
+            @PathVariable String pinNumber,
+            @PathVariable String doctorId) {
+        
+        log.info("API: Fetch active cases for PIN: {} and Doctor: {}", pinNumber, doctorId);
+        List<OpCaseDTO> cases = cvrService.getActiveOpCases(pinNumber, doctorId);
+        
+        ApiResponse<List<OpCaseDTO>> response = ApiResponse.success(
+            cases.size() + " active case(s) found",
+            cases
+        );
+        
+        return ResponseEntity.ok(response);
+    }
 }

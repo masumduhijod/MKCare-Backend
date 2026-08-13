@@ -37,4 +37,7 @@ public class LoginResponse {
     private String clinicLogo;    // e.g., "/logos/hms.png"
     private String clinicAddress;
     private String clinicPhone;
+    
+    // ⭐ RBAC - List of allowed module codes
+    private java.util.List<String> permissions;
 }

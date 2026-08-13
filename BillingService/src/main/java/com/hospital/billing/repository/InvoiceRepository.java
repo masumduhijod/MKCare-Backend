@@ -31,9 +31,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Query("SELECT i.invoiceNumber FROM Invoice i ORDER BY i.id DESC")
     List<String> findTopByOrderByIdDesc();
 
-List<Invoice> findByDoctorIdAndInvoiceDate(
-        String doctorId,
-        java.time.LocalDate invoiceDate);
+    List<Invoice> findByDoctorIdAndInvoiceDate(
+            String doctorId,
+            java.time.LocalDate invoiceDate);
+
+    List<Invoice> findByCvrNumberIn(List<String> cvrNumbers);
 
     @Query(value
             = "SELECT i.* FROM invoices i "

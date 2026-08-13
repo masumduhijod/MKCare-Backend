@@ -59,10 +59,12 @@ public class AppointmentServiceImpl implements AppointmentService {
         verifyDoctor(bookDTO.getDoctorId());
 
         // 3. Check if patient already has appointment with same doctor on same date
-        if (appointmentRepository.existsByPatientDoctorAndDate(
+        // RELAXED: Only block if it's a NEW consultation (no opCaseNumber)
+        if (bookDTO.getOpCaseNumber() == null && appointmentRepository.existsByPatientDoctorAndDate(
                 bookDTO.getPinNumber(), bookDTO.getDoctorId(), bookDTO.getAppointmentDate())) {
             throw new AppointmentConflictException(
-                "Patient already has an appointment with this doctor on " + bookDTO.getAppointmentDate()
+                "Patient already has an active consultation with this doctor today. " +
+                "Please select an existing case from the list if this is a follow-up."
             );
         }
 
@@ -117,12 +119,13 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setTokenNumber(tokenNumber);
         appointment.setAppointmentType(
             bookDTO.getAppointmentType() != null 
-                ? Appointment.AppointmentType.valueOf(bookDTO.getAppointmentType().toUpperCase())
+                ? Appointment.AppointmentType.valueOf(bookDTO.getAppointmentType().toUpperCase().replace("-", "_"))
                 : Appointment.AppointmentType.NEW
         );
         appointment.setStatus(Appointment.AppointmentStatus.SCHEDULED);
         appointment.setSymptoms(bookDTO.getSymptoms());
         appointment.setNotes(bookDTO.getNotes());
+        appointment.setOpCaseNumber(bookDTO.getOpCaseNumber());
         appointment.setCreatedBy(bookDTO.getCreatedBy());
 
         // Link CVR if provided
@@ -388,6 +391,7 @@ public List<AppointmentSummaryDTO> getTodaysAppointments() {
     dto.setAppointmentDate(apt.getAppointmentDate());
     dto.setAppointmentTime(apt.getAppointmentTime());
     dto.setStatus(apt.getStatus().name());
+    dto.setAppointmentType(apt.getAppointmentType() != null ? apt.getAppointmentType().name() : null);
 
     // ===============================
     // ✅ FETCH CVR USING APPOINTMENT ID

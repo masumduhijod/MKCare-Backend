@@ -82,6 +82,8 @@ public class CreateCvrDTO {
     // *** NO visit_date / visit_time ***
     // These will be NULL and set only on check-in
     
+    private String opCaseNumber;
+    
 //    @NotBlank(message = "Created by is required")
     private String createdBy;
 }

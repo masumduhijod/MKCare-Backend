@@ -9,7 +9,6 @@ import com.hospital.user.dto.ApiResponse;
 import com.hospital.user.dto.ChangePasswordDTO;
 import com.hospital.user.dto.UserDTO;
 import com.hospital.user.service.UserService;
-import static java.lang.StrictMath.log;
 import java.util.List;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +22,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.PostMapping;
 import com.hospital.user.dto.ResetPasswordDTO;
 import com.hospital.user.dto.UserUpdateDTO;
+import com.hospital.user.config.TenantContext;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import java.util.*;
 
 /**
  *
@@ -40,6 +42,51 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 public class UserController {
 
     private final UserService userService;
+
+    // ... existing methods ...
+
+    // =====================================================================
+    // ⭐ RBAC: ROLE & MODULE MANAGEMENT (For Clinic Admins)
+    // =====================================================================
+
+    @GetMapping("/roles")
+    public ResponseEntity<ApiResponse<List<String>>> getRoles() {
+        return ResponseEntity.ok(ApiResponse.success("Roles fetched", userService.getRoles()));
+    }
+
+    @GetMapping("/modules")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getModules() {
+        return ResponseEntity.ok(ApiResponse.success("Modules fetched", userService.getModules()));
+    }
+
+    @GetMapping("/role-permissions/{roleName}")
+    public ResponseEntity<ApiResponse<List<String>>> getRolePermissions(@PathVariable String roleName) {
+        String tenantId = TenantContext.getTenantId();
+        return ResponseEntity.ok(ApiResponse.success("Permissions fetched", userService.getRolePermissions(roleName, tenantId)));
+    }
+
+    @PostMapping("/role-permissions/{roleName}")
+    public ResponseEntity<ApiResponse<String>> updateRolePermissions(
+            @PathVariable String roleName, @RequestBody List<String> moduleCodes) {
+        String tenantId = TenantContext.getTenantId();
+        userService.updateRolePermissions(roleName, moduleCodes, tenantId);
+        return ResponseEntity.ok(ApiResponse.success("Permissions updated for role: " + roleName, roleName));
+    }
+
+    @GetMapping("/{userId}/permissions")
+    public ResponseEntity<ApiResponse<List<String>>> getUserPermissions(@PathVariable Long userId) {
+        String tenantId = TenantContext.getTenantId();
+        // We can reuse SuperAdminService logic if we autowire it, or add to UserService
+        return ResponseEntity.ok(ApiResponse.success("User permissions fetched", userService.getUserPermissions(tenantId, userId)));
+    }
+
+    @PostMapping("/{userId}/permissions")
+    public ResponseEntity<ApiResponse<String>> updateUserPermissions(
+            @PathVariable Long userId, @RequestBody List<String> moduleCodes) {
+        String tenantId = TenantContext.getTenantId();
+        userService.updateUserPermissions(tenantId, userId, moduleCodes);
+        return ResponseEntity.ok(ApiResponse.success("User permissions updated", tenantId));
+    }
 
     @GetMapping("/{username}")
     public ResponseEntity<ApiResponse<UserDTO>> getUserByUsername(@PathVariable String username) {

@@ -83,7 +83,7 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
 
                 HikariDataSource dataSource = new HikariDataSource();
                 dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/" + tenant.getDbName() +
-                        "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
+                        "?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true");
                 dataSource.setUsername("root");
                 dataSource.setPassword("Pass@123");
                 dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
@@ -94,6 +94,10 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
                 dataSource.setMaxLifetime(1800000);
 
                 tenantDataSources.put(tenantId, dataSource);
+                
+                // ⭐ Auto-migrate schema for this tenant
+                ensureSchemaUpdated(dataSource);
+                
                 setTargetDataSources(tenantDataSources);
                 afterPropertiesSet();
 
@@ -103,5 +107,24 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
         }
 
         return (DataSource) tenantDataSources.get(tenantId);
+    }
+
+    private void ensureSchemaUpdated(DataSource dataSource) {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        try {
+            // Check for op_case_number in appointments
+            String checkSql = "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                             "WHERE TABLE_SCHEMA = DATABASE() " +
+                             "AND TABLE_NAME = 'appointments' " +
+                             "AND COLUMN_NAME = 'op_case_number'";
+            
+            Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class);
+            if (count != null && count == 0) {
+                System.out.println("🚀 Adding op_case_number column to appointments table...");
+                jdbcTemplate.execute("ALTER TABLE appointments ADD COLUMN op_case_number VARCHAR(20)");
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Could not update appointments schema: " + e.getMessage());
+        }
     }
 }

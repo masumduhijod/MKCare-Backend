@@ -17,6 +17,7 @@ import java.util.List;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -59,6 +60,13 @@ public class ConsultationController {
     public ResponseEntity<ApiResponse<ConsultationDTO>> getConsultation(@PathVariable String consultationId) {
         log.info("API: Get consultation {}", consultationId);
         ConsultationDTO consultation = consultationService.getConsultationById(consultationId);
+        return ResponseEntity.ok(ApiResponse.success("Consultation found", consultation));
+    }
+
+    @GetMapping("/cvr/{cvrNumber}")
+    public ResponseEntity<ApiResponse<ConsultationDTO>> getByCvrNumber(@PathVariable String cvrNumber) {
+        log.info("API: Get consultation by CVR {}", cvrNumber);
+        ConsultationDTO consultation = consultationService.getConsultationByCvrNumber(cvrNumber);
         return ResponseEntity.ok(ApiResponse.success("Consultation found", consultation));
     }
 
@@ -124,6 +132,13 @@ public class ConsultationController {
         );
     }
 
+    @GetMapping("/clinically-finalized")
+    public ResponseEntity<ApiResponse<List<String>>> getClinicallyFinalizedCvrs(
+            @RequestParam String doctorId, 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        log.info("API: Getting clinically finalized CVRs for Doctor {} on {}", doctorId, date);
+        List<String> cvrs = consultationService.getClinicallyFinalizedCvrs(doctorId, date);
+        return ResponseEntity.ok(ApiResponse.success("Finalized CVRs retrieved", cvrs));
+    }
 
 }
-

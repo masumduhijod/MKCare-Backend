@@ -10,7 +10,7 @@ spring:
   # ⭐ Master Database (Tenant Lookup)
   datasource:
     master:
-      jdbc-url: jdbc:mysql://localhost:3306/hms_master?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      jdbc-url: jdbc:mysql://localhost:3306/hms_master?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true
       username: root
       password: Pass@123
       driver-class-name: com.mysql.cj.jdbc.Driver

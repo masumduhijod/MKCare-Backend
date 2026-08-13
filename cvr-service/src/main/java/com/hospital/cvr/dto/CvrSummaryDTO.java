@@ -65,6 +65,8 @@ public class CvrSummaryDTO {
     private String chiefComplaint;
     private String status;
     private String doctorName;
+    private String doctorId;
+    private String department;
     
     // Helper
     private Boolean hasVisited;

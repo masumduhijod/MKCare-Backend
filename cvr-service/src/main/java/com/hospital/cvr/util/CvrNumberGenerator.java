@@ -114,4 +114,25 @@ public class CvrNumberGenerator {
     public String generateCVRForToday(String lastCvrNumber) {
         return generateCVR(lastCvrNumber, LocalDate.now());
     }
+
+    /**
+     * Generate unique OP Case number
+     * Format: OPC + YYYYMMDD + Sequential Number (3 digits)
+     */
+    public String generateOpCase(String lastOpCaseNumber, LocalDate date) {
+        String dateStr = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        int nextNumber = 1;
+        if (lastOpCaseNumber != null && !lastOpCaseNumber.isEmpty()) {
+            try {
+                String lastDate = lastOpCaseNumber.substring(3, 11);
+                String lastNumberStr = lastOpCaseNumber.substring(11);
+                if (lastDate.equals(dateStr)) {
+                    nextNumber = Integer.parseInt(lastNumberStr) + 1;
+                }
+            } catch (Exception e) {
+                nextNumber = 1;
+            }
+        }
+        return String.format("OPC%s%03d", dateStr, nextNumber);
+    }
 }

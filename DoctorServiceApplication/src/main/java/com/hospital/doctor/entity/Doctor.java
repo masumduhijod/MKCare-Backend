@@ -87,6 +87,9 @@ public class Doctor {
     @Column(name = "follow_up_fee", precision = 10, scale = 2)
     private BigDecimal followUpFee;
 
+    @Column(name = "follow_up_days_limit")
+    private Integer followUpDaysLimit = 7; // Default 7 days
+
     // Availability Status
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
