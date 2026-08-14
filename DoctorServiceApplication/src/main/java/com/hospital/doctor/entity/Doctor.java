@@ -130,6 +130,7 @@ public class Doctor {
 
     // Enums
     public enum DoctorStatus {
+        ACTIVE,
         AVAILABLE,
         ON_LEAVE,
         BUSY,

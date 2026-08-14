@@ -1,14 +1,13 @@
 @echo off
-title Build All HMIS Microservices
-color 0E
+title Stop All HMIS Microservices
+color 0C
 echo ===================================================
-echo   Cleaning and Building All Microservices...
+echo   Stopping All Running HMIS Microservices...
 echo ===================================================
 
-cd /d "%~dp0"
-call "C:\Program Files\NetBeans 8.2\java\maven\bin\mvn.bat" clean package -DskipTests
+taskkill /F /IM java.exe /T
 
 echo ===================================================
-echo   BUILD COMPLETED SUCCESSFULLY!
+echo   All Microservices Stopped Successfully!
 echo ===================================================
 pause
