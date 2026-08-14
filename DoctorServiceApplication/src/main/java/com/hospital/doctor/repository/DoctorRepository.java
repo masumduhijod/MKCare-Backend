@@ -61,21 +61,21 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     /**
      * Find available doctors
      */
-    @Query("SELECT d FROM Doctor d WHERE d.status = 'AVAILABLE' AND d.availableForOPD = true " +
+    @Query("SELECT d FROM Doctor d WHERE (d.status = 'AVAILABLE' OR d.status = 'ACTIVE') AND (d.availableForOPD IS NULL OR d.availableForOPD = true) " +
            "ORDER BY d.firstName")
     List<Doctor> findAvailableDoctors();
 
     /**
      * Find available doctors by specialization
      */
-    @Query("SELECT d FROM Doctor d WHERE d.status = 'AVAILABLE' AND d.availableForOPD = true " +
+    @Query("SELECT d FROM Doctor d WHERE (d.status = 'AVAILABLE' OR d.status = 'ACTIVE') AND (d.availableForOPD IS NULL OR d.availableForOPD = true) " +
            "AND LOWER(d.specialization) = LOWER(:specialization)")
     List<Doctor> findAvailableDoctorsBySpecialization(@Param("specialization") String specialization);
 
     /**
      * Find available doctors by department
      */
-    @Query("SELECT d FROM Doctor d WHERE d.status = 'AVAILABLE' AND d.availableForOPD = true " +
+    @Query("SELECT d FROM Doctor d WHERE (d.status = 'AVAILABLE' OR d.status = 'ACTIVE') AND (d.availableForOPD IS NULL OR d.availableForOPD = true) " +
            "AND LOWER(d.department) = LOWER(:department)")
     List<Doctor> findAvailableDoctorsByDepartment(@Param("department") String department);
 
