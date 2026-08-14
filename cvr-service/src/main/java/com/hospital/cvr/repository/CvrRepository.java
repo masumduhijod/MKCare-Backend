@@ -85,7 +85,7 @@ public interface CvrRepository extends JpaRepository<CaseVisitRecord, Long> {
     /**
      * Get today's CVRs
      */
-    @Query("SELECT c FROM CaseVisitRecord c WHERE c.visitDate = :today " +
+    @Query("SELECT c FROM CaseVisitRecord c WHERE (c.visitDate = :today OR c.appointmentDate = :today OR DATE(c.createdAt) = :today) " +
            "ORDER BY c.createdAt DESC")
     List<CaseVisitRecord> findTodaysCVRs(@Param("today") LocalDate today);
 

@@ -37,7 +37,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     /**
      * Fetch all payments for a specific doctor in a date range.
      */
-    @Query("SELECT p FROM Payment p WHERE p.invoice.doctorId = :doctorId AND p.paymentDate >= :startDateTime AND p.paymentDate <= :endDateTime ORDER BY p.paymentDate DESC")
+    @Query("SELECT p FROM Payment p WHERE (p.invoice.doctorId = :doctorId OR p.invoice.createdBy = :doctorId OR LOWER(p.invoice.doctorId) = LOWER(:doctorId)) AND p.paymentDate >= :startDateTime AND p.paymentDate <= :endDateTime ORDER BY p.paymentDate DESC")
     List<Payment> findByDoctorIdAndPaymentDateRange(
             @org.springframework.data.repository.query.Param("doctorId") String doctorId,
             @org.springframework.data.repository.query.Param("startDateTime") java.time.LocalDateTime startDateTime,
