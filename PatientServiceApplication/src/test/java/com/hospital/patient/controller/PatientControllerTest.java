@@ -89,4 +89,46 @@ public class PatientControllerTest {
                 .andExpect(jsonPath("$.data.pinNumber").value(pinNumber))
                 .andExpect(jsonPath("$.data.firstName").value("Rahul"));
     }
+
+    @Test
+    @DisplayName("GET /patients/search - Search patient by query")
+    void testSearchPatients() throws Exception {
+        com.hospital.patient.dto.PatientSearchDTO mockSearch = new com.hospital.patient.dto.PatientSearchDTO();
+        mockSearch.setPatientId(1L);
+        mockSearch.setPinNumber("PIN100001");
+        mockSearch.setFullName("Rahul Sharma");
+
+        Mockito.when(patientService.searchPatients("Rahul", "NAME")).thenReturn(java.util.Collections.singletonList(mockSearch));
+
+        mockMvc.perform(get("/patients/search").param("query", "Rahul").param("type", "NAME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].fullName").value("Rahul Sharma"));
+    }
+
+    @Test
+    @DisplayName("GET /patients/active - List all active patients")
+    void testGetAllActivePatients() throws Exception {
+        PatientDTO mockPatient = new PatientDTO();
+        mockPatient.setPatientId(1L);
+        mockPatient.setPinNumber("PIN100001");
+
+        Mockito.when(patientService.getAllActivePatients()).thenReturn(java.util.Collections.singletonList(mockPatient));
+
+        mockMvc.perform(get("/patients/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].pinNumber").value("PIN100001"));
+    }
+
+    @Test
+    @DisplayName("GET /patients/count - Get total registered patients count")
+    void testGetPatientCount() throws Exception {
+        Mockito.when(patientService.getTotalActivePatients()).thenReturn(15L);
+
+        mockMvc.perform(get("/patients/count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(15));
+    }
 }

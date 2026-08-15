@@ -80,4 +80,57 @@ public class DoctorControllerTest {
                 .andExpect(jsonPath("$.data.doctorId").value(doctorId))
                 .andExpect(jsonPath("$.data.firstName").value("Dr. Ramesh"));
     }
+
+    @Test
+    @DisplayName("GET /doctors/active - Get Active Doctors")
+    void testGetActiveDoctors() throws Exception {
+        DoctorDTO mockDoctor = new DoctorDTO();
+        mockDoctor.setDoctorId("DOC1001");
+        mockDoctor.setFirstName("Dr. Rajesh");
+        mockDoctor.setLastName("Verma");
+
+        Mockito.when(doctorService.getAllActiveDoctors()).thenReturn(java.util.Collections.singletonList(mockDoctor));
+
+        mockMvc.perform(get("/doctors/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].doctorId").value("DOC1001"));
+    }
+
+    @Test
+    @DisplayName("GET /doctors/departments - Get All Departments")
+    void testGetAllDepartments() throws Exception {
+        Mockito.when(doctorService.getAllDepartments()).thenReturn(java.util.Arrays.asList("OPD", "Cardiology"));
+
+        mockMvc.perform(get("/doctors/departments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0]").value("OPD"));
+    }
+
+    @Test
+    @DisplayName("GET /doctors/available/department/{department} - Get Available Doctors by Department")
+    void testGetAvailableDoctorsByDepartment() throws Exception {
+        com.hospital.doctor.dto.DoctorSummaryDTO mockSummary = new com.hospital.doctor.dto.DoctorSummaryDTO();
+        mockSummary.setDoctorId("DOC1001");
+        mockSummary.setDepartment("OPD");
+
+        Mockito.when(doctorService.getAvailableDoctorsByDepartment("OPD")).thenReturn(java.util.Collections.singletonList(mockSummary));
+
+        mockMvc.perform(get("/doctors/available/department/OPD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].doctorId").value("DOC1001"));
+    }
+
+    @Test
+    @DisplayName("GET /doctors/count - Get Total Active Doctor Count")
+    void testGetDoctorCount() throws Exception {
+        Mockito.when(doctorService.getTotalActiveDoctors()).thenReturn(1L);
+
+        mockMvc.perform(get("/doctors/count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(1));
+    }
 }
